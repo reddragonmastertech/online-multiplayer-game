@@ -1,0 +1,16 @@
+{
+  "name": "game-platform",
+  "private": true,
+  "packageManager": "pnpm@10.15.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @game-platform/web --filter @game-platform/api dev",
+    "dev:web": "pnpm --filter @game-platform/web dev",
+    "dev:api": "pnpm --filter @game-platform/api dev",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "build": "pnpm -r --if-present build"
+  }
+}
