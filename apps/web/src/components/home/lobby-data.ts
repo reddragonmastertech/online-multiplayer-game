@@ -69,6 +69,29 @@ export type LiveMatch = {
   right: Player;
 };
 
+export const matchRounds: Record<string, { round: number; detail: string }[]> = {
+  m1: [{ round: 1, detail: "cobra8481 won · Paper beats Rock" }],
+  m2: [],
+  m3: [{ round: 1, detail: "lee won · Scissors beats Paper" }],
+  m4: [
+    { round: 1, detail: "wealth won · Paper beats Rock" },
+    { round: 2, detail: "ISABELLA01 won · Scissors beats Paper" },
+  ],
+  m5: [
+    { round: 1, detail: "Liam won · Rock beats Scissors" },
+    { round: 2, detail: "Sam won · Paper beats Rock" },
+  ],
+  m6: [
+    { round: 1, detail: "MATEO won · Rock beats Scissors" },
+    { round: 2, detail: "ghost won · Paper beats Rock" },
+  ],
+  m7: [{ round: 1, detail: "rider_844 won · Scissors beats Paper" }],
+  m8: [
+    { round: 1, detail: "2587 won · Rock beats Scissors" },
+    { round: 2, detail: "B296 won · Paper beats Rock" },
+  ],
+};
+
 export const liveMatches: LiveMatch[] = [
   {
     id: "m1",

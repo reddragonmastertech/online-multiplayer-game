@@ -1,5 +1,6 @@
 import { Clock, Gamepad2, Pause } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   dailyMissions,
   featuredMatch,
@@ -71,9 +72,11 @@ function LiveMatchCard({ match }: { match: LiveMatch }) {
   const usdt = match.currency === "usdt";
 
   return (
-    <article
+    <Link
+      to={`/room/${match.id}`}
+      aria-label={`Watch ${match.left.name} versus ${match.right.name}`}
       className={cn(
-        "rounded-2xl border p-3",
+        "block rounded-2xl border p-3 transition hover:-translate-y-0.5 hover:border-[#f3c969]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f3c969]",
         usdt
           ? "border-amber-300/40 bg-gradient-to-b from-[#241c0e] to-[#100e0b] shadow-[0_0_24px_rgb(245_158_11/0.06)]"
           : "border-emerald-400/35 bg-gradient-to-b from-[#10241c] to-[#0b1210] shadow-[0_0_24px_rgb(16_185_129/0.06)]",
@@ -101,7 +104,7 @@ function LiveMatchCard({ match }: { match: LiveMatch }) {
         <span className="pt-3 text-[10px] text-white/35">VS</span>
         <MatchPlayer {...match.right} />
       </div>
-    </article>
+    </Link>
   );
 }
 
