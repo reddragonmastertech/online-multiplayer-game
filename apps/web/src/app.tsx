@@ -3,6 +3,7 @@ import { ArenaFrame } from "@/components/layout/arena-frame";
 import { AppShell } from "@/components/layout/app-shell";
 import { AccountPage } from "@/pages/account-page";
 import { BlankPage } from "@/pages/blank-page";
+import { CpuMatchPage } from "@/pages/cpu-match-page";
 import { GameRoomPage } from "@/pages/game-room-page";
 import { HomePage } from "@/pages/home-page";
 
@@ -13,6 +14,7 @@ export function App() {
         <Route element={<ArenaFrame />}>
           <Route index element={<HomePage />} />
           <Route path="room/:matchId" element={<GameRoomPage />} />
+          <Route path="vs/:stakeId" element={<CpuMatchPage />} />
           <Route path="account" element={<AccountPage />} />
         </Route>
         <Route element={<AppShell />}>

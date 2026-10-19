@@ -41,13 +41,19 @@ export const totalMissions = [
 ] as const;
 
 export const stakes = [
-  { amount: "1 RAC", playing: 54, currency: "rac" },
-  { amount: "5 RAC", playing: 73, currency: "rac" },
-  { amount: "10 RAC", playing: 54, currency: "rac" },
-  { amount: "0.1 USDT", playing: 34, currency: "usdt" },
-  { amount: "0.2 USDT", playing: 8, currency: "usdt" },
-  { amount: "0.5 USDT", playing: 18, currency: "usdt" },
+  { id: "1-rac", amount: "1 RAC", playing: 54, currency: "rac" },
+  { id: "5-rac", amount: "5 RAC", playing: 73, currency: "rac" },
+  { id: "10-rac", amount: "10 RAC", playing: 54, currency: "rac" },
+  { id: "0-1-usdt", amount: "0.1 USDT", playing: 34, currency: "usdt" },
+  { id: "0-2-usdt", amount: "0.2 USDT", playing: 8, currency: "usdt" },
+  { id: "0-5-usdt", amount: "0.5 USDT", playing: 18, currency: "usdt" },
 ] as const;
+
+export type Stake = (typeof stakes)[number];
+
+export function findStake(id: string) {
+  return stakes.find((stake) => stake.id === id);
+}
 
 export const recentWinners = [
   { name: "smith611", amount: "+10 RAC", currency: "rac", avatar: 12 },

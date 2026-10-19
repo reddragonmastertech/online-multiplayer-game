@@ -1,6 +1,5 @@
 import { Clock, Gamepad2, Pause } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   dailyMissions,
   featuredMatch,
@@ -20,13 +19,12 @@ function rewardClass(currency: Currency) {
     : "bg-amber-300/15 text-amber-200";
 }
 
-function stakeSurface(currency: Currency, selected: boolean) {
+function stakeSurface(currency: Currency) {
   return cn(
-    "flex min-h-28 flex-col items-center justify-center rounded-2xl border px-2 py-3 text-center transition",
+    "flex min-h-28 flex-col items-center justify-center rounded-2xl border px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-[#f3c969]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f3c969]",
     currency === "rac"
       ? "border-emerald-400/45 bg-gradient-to-b from-[#143026] to-[#0b1612]"
       : "border-amber-300/50 bg-gradient-to-b from-[#3a2e14] to-[#14110c]",
-    selected && "ring-2 ring-[#f3c969]",
   );
 }
 
@@ -109,7 +107,7 @@ function LiveMatchCard({ match }: { match: LiveMatch }) {
 }
 
 export function LobbyMain() {
-  const [selectedStake, setSelectedStake] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   return (
     <main className="space-y-4 p-3 xl:min-h-0 xl:overflow-y-auto xl:p-4">
@@ -185,14 +183,12 @@ export function LobbyMain() {
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
           {stakes.map((stake) => {
-            const selected = selectedStake === stake.amount;
             return (
               <button
-                key={stake.amount}
+                key={stake.id}
                 type="button"
-                aria-pressed={selected}
-                onClick={() => setSelectedStake(stake.amount)}
-                className={stakeSurface(stake.currency, selected)}
+                onClick={() => navigate(`/vs/${stake.id}`)}
+                className={stakeSurface(stake.currency)}
               >
                 <p className="text-lg font-semibold">{stake.amount}</p>
                 <p className="mt-1 text-[11px] text-white/45">{stake.playing} playing</p>
