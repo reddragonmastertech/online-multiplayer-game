@@ -14,6 +14,7 @@ export function App() {
         <Route element={<ArenaFrame />}>
           <Route index element={<HomePage />} />
           <Route path="room/:matchId" element={<GameRoomPage />} />
+          <Route path="matches/:matchId" element={<GameRoomPage />} />
           <Route path="vs/:stakeId" element={<CpuMatchPage />} />
           <Route path="account" element={<AccountPage />} />
         </Route>
