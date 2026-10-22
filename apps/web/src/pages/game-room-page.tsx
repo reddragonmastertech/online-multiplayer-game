@@ -15,7 +15,9 @@ export function GameRoomPage() {
   const match = liveMatches.find((item) => item.id === matchId);
 
   if (!match) {
-    return <MatchClosed title="Match closed" detail="That room is no longer on the board." />;
+    return (
+      <MatchClosed title="Match closed" detail="That room is no longer on the board." backTo="/watch" />
+    );
   }
 
   const live = match.countdown !== undefined;
@@ -49,7 +51,8 @@ export function GameRoomPage() {
       round: round.round,
       detail: round.detail,
     })),
-    backTo: "/",
+    backTo: "/watch",
+    backLabel: "Watch",
   };
 
   return (

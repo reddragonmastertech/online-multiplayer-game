@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { AuthModal } from "@/components/auth/auth-modal";
-import { HomeHeader } from "@/components/home/home-header";
+import { SiteHeader } from "@/components/layout/site-header";
 import { useUiStore } from "@/stores/ui-store";
 
 export function ArenaFrame() {
@@ -9,13 +9,14 @@ export function ArenaFrame() {
   const closeAuth = useUiStore((state) => state.closeAuth);
 
   useEffect(() => {
+    if (pathname === "/login" || pathname === "/signup") return;
     closeAuth();
   }, [pathname, closeAuth]);
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-[#070b14] font-[Inter,Segoe_UI,sans-serif] text-white">
-      <HomeHeader />
-      <div className="min-h-0 flex-1 overflow-hidden">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background font-sans text-foreground">
+      <SiteHeader />
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <Outlet />
       </div>
       <AuthModal />

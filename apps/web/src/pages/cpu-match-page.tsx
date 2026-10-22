@@ -148,7 +148,8 @@ function CpuTable({ stake }: { stake: Stake }) {
       round: entry.round,
       detail: viewerRoundDetail(entry, "a"),
     })),
-    backTo: "/",
+    backTo: "/games/rps",
+    backLabel: "RPS Lobby",
   };
 
   return (
@@ -186,7 +187,13 @@ export function CpuMatchPage() {
   const stake = findStake(stakeId);
 
   if (!stake) {
-    return <MatchClosed title="Stake closed" detail="That match is not on the board." />;
+    return (
+      <MatchClosed
+        title="Stake closed"
+        detail="That match is not on the board."
+        backTo="/games/rps"
+      />
+    );
   }
 
   return <CpuTable key={stake.id} stake={stake} />;
