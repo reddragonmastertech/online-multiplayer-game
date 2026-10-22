@@ -1,5 +1,10 @@
 import cors from "@fastify/cors";
 import { createGameRegistry } from "@game-platform/game-core";
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+  SocketData,
+} from "@game-platform/shared";
 import Fastify from "fastify";
 import { Server } from "socket.io";
 import type { AppConfig } from "./config";
@@ -15,9 +20,12 @@ export async function buildServer(config: AppConfig) {
 
   app.get("/health", async () => ({ status: "ok" }));
 
-  const io = new Server(app.server, {
-    cors: { origin: config.webOrigin },
-  });
+  const io = new Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>(
+    app.server,
+    {
+      cors: { origin: config.webOrigin },
+    },
+  );
 
   app.addHook("onClose", async () => {
     await io.close();

@@ -18,7 +18,8 @@
     "noUncheckedIndexedAccess": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@game-platform/shared": ["../../packages/shared/src/index.ts"]
     }
   },
   "include": ["src"]

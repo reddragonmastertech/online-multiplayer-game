@@ -13,3 +13,4 @@ blob-report
 Thumbs.db
 *.tsbuildinfo
 docs
+.cursor

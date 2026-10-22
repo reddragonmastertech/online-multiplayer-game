@@ -74,6 +74,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@game-platform/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@radix-ui/react-slot':
         specifier: ^1.4.0
         version: 1.4.0(@types/react@19.3.0)(react@19.3.0)
