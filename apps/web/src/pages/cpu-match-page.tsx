@@ -1,33 +1,33 @@
+import {
+  advanceRound,
+  randomHand,
+  rpsEngine,
+  viewerRoundDetail,
+  type RpsState,
+} from "@game-platform/game-rps";
+import { MATCH_RULES, rpsHands, type RpsHand } from "@game-platform/shared";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { findStake, panelClass, type Stake } from "@/components/home/lobby-data";
 import { Portrait } from "@/components/home/portrait";
-import {
-  hands,
-  judgeRound,
-  randomHand,
-  roundDetail,
-  type Hand,
-  type RoundResult,
-} from "@/lib/rps";
 import { cn } from "@/lib/utils";
 
-const WIN_SCORE = 2;
-const ROUND_SECONDS = 10;
+const YOU = "you";
+const CPU = "cpu";
 const THINK_MS = 700;
-const REVEAL_MS = 1500;
 
-const glyphs: Record<Hand, string> = {
+const glyphs: Record<RpsHand, string> = {
   Rock: "✊",
   Paper: "✋",
   Scissors: "✌️",
 };
 
-type Phase = "choose" | "thinking" | "reveal" | "done";
-type LogEntry = { id: number; detail: string };
+function createMatch() {
+  return rpsEngine.initialState({ a: YOU, b: CPU });
+}
 
-function MoveMark({ move }: { move: Hand | "Choosing" }) {
+function MoveMark({ move }: { move: RpsHand | "Choosing" }) {
   const hidden = move === "Choosing";
 
   return (
@@ -72,47 +72,47 @@ function PlayerSide({
 }
 
 function MatchTable({ stake }: { stake: Stake }) {
-  const [phase, setPhase] = useState<Phase>("choose");
-  const [round, setRound] = useState(1);
-  const [seconds, setSeconds] = useState(ROUND_SECONDS);
-  const [youScore, setYouScore] = useState(0);
-  const [cpuScore, setCpuScore] = useState(0);
-  const [youMove, setYouMove] = useState<Hand | "Choosing">("Choosing");
-  const [cpuMove, setCpuMove] = useState<Hand | "Choosing">("Choosing");
-  const [roundResult, setRoundResult] = useState<RoundResult | null>(null);
-  const [log, setLog] = useState<LogEntry[]>([]);
+  const [match, setMatch] = useState<RpsState>(createMatch);
+  const [uiPhase, setUiPhase] = useState<"choose" | "thinking">("choose");
+  const [seconds, setSeconds] = useState<number>(MATCH_RULES.roundSeconds);
   const locked = useRef(false);
   const timers = useRef<number[]>([]);
-  const playRef = useRef<(hand: Hand) => void>(() => {});
+  const playRef = useRef<(hand: RpsHand) => void>(() => {});
 
+  const phase =
+    match.phase === "finished" ? "done" : match.phase === "reveal" ? "reveal" : uiPhase;
+  const youScore = match.seats.a.score;
+  const cpuScore = match.seats.b.score;
+  const youMove = match.seats.a.hand ?? "Choosing";
+  const cpuMove =
+    match.phase === "choosing" && uiPhase === "thinking"
+      ? "Choosing"
+      : (match.seats.b.hand ?? "Choosing");
+  const lastRound = match.log.at(-1);
   const usdt = stake.currency === "usdt";
   const tone = usdt
     ? "border-amber-300/40 bg-gradient-to-b from-[#241c0e] to-[#100e0b]"
     : "border-emerald-400/35 bg-gradient-to-b from-[#10241c] to-[#0b1210]";
-  const youWonMatch = youScore >= WIN_SCORE;
+  const result = rpsEngine.status(match);
+  const youWonMatch = result.kind === "winner" && result.playerId === YOU;
 
   function later(run: () => void, ms: number) {
     const id = window.setTimeout(run, ms);
     timers.current.push(id);
   }
 
-  function play(hand: Hand) {
-    if (locked.current || phase !== "choose") return;
+  function play(hand: RpsHand) {
+    if (locked.current || match.phase !== "choosing" || uiPhase !== "choose") return;
     locked.current = true;
-    const cpu = randomHand();
-    const result = judgeRound(hand, cpu);
-    const nextYou = youScore + (result === "you" ? 1 : 0);
-    const nextCpu = cpuScore + (result === "cpu" ? 1 : 0);
-
-    setYouMove(hand);
-    setPhase("thinking");
+    setMatch((current) => rpsEngine.applyMove(current, YOU, hand));
+    setUiPhase("thinking");
     later(() => {
-      setCpuMove(cpu);
-      setYouScore(nextYou);
-      setCpuScore(nextCpu);
-      setRoundResult(result);
-      setLog((entries) => [...entries, { id: round, detail: roundDetail(result, hand, cpu) }]);
-      setPhase(nextYou >= WIN_SCORE || nextCpu >= WIN_SCORE ? "done" : "reveal");
+      setMatch((current) => {
+        const withCpu = current.seats.b.hand
+          ? current
+          : rpsEngine.applyMove(current, CPU, randomHand());
+        return rpsEngine.resolveRound(withCpu);
+      });
     }, THINK_MS);
   }
 
@@ -127,8 +127,8 @@ function MatchTable({ stake }: { stake: Stake }) {
   useEffect(() => {
     if (phase !== "choose") return;
     let alive = true;
-    let remaining = ROUND_SECONDS;
-    setSeconds(ROUND_SECONDS);
+    let remaining = MATCH_RULES.roundSeconds;
+    setSeconds(MATCH_RULES.roundSeconds);
     const id = window.setInterval(() => {
       if (!alive) return;
       remaining -= 1;
@@ -142,33 +142,24 @@ function MatchTable({ stake }: { stake: Stake }) {
       alive = false;
       window.clearInterval(id);
     };
-  }, [phase, round]);
+  }, [phase, match.round]);
 
   useEffect(() => {
-    if (phase !== "reveal") return;
+    if (match.phase !== "reveal") return;
     const id = window.setTimeout(() => {
       locked.current = false;
-      setYouMove("Choosing");
-      setCpuMove("Choosing");
-      setRoundResult(null);
-      setRound((current) => current + 1);
-      setPhase("choose");
-    }, REVEAL_MS);
+      setMatch((current) => advanceRound(current));
+      setUiPhase("choose");
+    }, MATCH_RULES.revealMs);
     return () => window.clearTimeout(id);
-  }, [phase]);
+  }, [match.phase, match.round]);
 
   function playAgain() {
     timers.current.forEach((id) => window.clearTimeout(id));
     timers.current = [];
     locked.current = false;
-    setYouScore(0);
-    setCpuScore(0);
-    setRound(1);
-    setYouMove("Choosing");
-    setCpuMove("Choosing");
-    setRoundResult(null);
-    setLog([]);
-    setPhase("choose");
+    setMatch(createMatch());
+    setUiPhase("choose");
   }
 
   const status =
@@ -176,9 +167,9 @@ function MatchTable({ stake }: { stake: Stake }) {
       ? "Pick a hand"
       : phase === "thinking"
         ? "CPU is choosing"
-        : roundResult === "draw"
+        : lastRound?.outcome === "draw"
           ? "Draw"
-          : roundResult === "you"
+          : lastRound?.outcome === "a"
             ? "You won the round"
             : "CPU won the round";
 
@@ -214,7 +205,7 @@ function MatchTable({ stake }: { stake: Stake }) {
                 Pot {stake.amount}
               </p>
               <p className="text-white/55">
-                Round {round} · First to {WIN_SCORE}
+                Round {match.round} · First to {MATCH_RULES.winScore}
               </p>
             </header>
 
@@ -248,7 +239,7 @@ function MatchTable({ stake }: { stake: Stake }) {
             </div>
 
             <div className="mt-6 grid grid-cols-3 gap-2">
-              {hands.map((hand) => {
+              {rpsHands.map((hand) => {
                 const selected = youMove === hand;
                 return (
                   <button
@@ -267,7 +258,9 @@ function MatchTable({ stake }: { stake: Stake }) {
                       {glyphs[hand]}
                     </span>
                     <p className="mt-1 text-xs font-semibold">{hand}</p>
-                    <p className="text-[10px] text-white/40">beats {hand === "Rock" ? "Scissors" : hand === "Paper" ? "Rock" : "Paper"}</p>
+                    <p className="text-[10px] text-white/40">
+                      beats {hand === "Rock" ? "Scissors" : hand === "Paper" ? "Rock" : "Paper"}
+                    </p>
                   </button>
                 );
               })}
@@ -291,16 +284,16 @@ function MatchTable({ stake }: { stake: Stake }) {
 
         <section className={cn(panelClass, "p-4")}>
           <h3 className="text-xs font-semibold tracking-[0.16em] text-white/75">ROUND LOG</h3>
-          {log.length === 0 ? (
+          {match.log.length === 0 ? (
             <p className="mt-3 text-sm text-white/45">No rounds yet. Pick a hand before the timer ends.</p>
           ) : (
             <ul className="mt-3 space-y-2">
-              {log.map((entry) => (
-                <li key={entry.id} className="flex items-center gap-3 rounded-xl bg-black/30 px-3 py-2.5">
+              {match.log.map((entry) => (
+                <li key={entry.round} className="flex items-center gap-3 rounded-xl bg-black/30 px-3 py-2.5">
                   <span className="text-[11px] font-semibold tracking-[0.14em] text-[#f3c969]">
-                    R{entry.id}
+                    R{entry.round}
                   </span>
-                  <p className="min-w-0 flex-1 text-sm">{entry.detail}</p>
+                  <p className="min-w-0 flex-1 text-sm">{viewerRoundDetail(entry, "a")}</p>
                 </li>
               ))}
             </ul>

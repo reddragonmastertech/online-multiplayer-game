@@ -8,6 +8,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@game-platform/game-rps": fileURLToPath(
+        new URL("../../packages/games/rps/src/index.ts", import.meta.url),
+      ),
       "@game-platform/shared": fileURLToPath(
         new URL("../../packages/shared/src/index.ts", import.meta.url),
       ),

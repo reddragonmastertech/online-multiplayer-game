@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { GameEngine } from "./engine";
 import { createGameRegistry, type GameManifest } from "./registry";
 
 const rps: GameManifest = {
@@ -26,5 +27,15 @@ describe("createGameRegistry", () => {
     registry.register(rps);
 
     expect(() => registry.register(rps)).toThrow(/already registered/);
+  });
+
+  it("stores an engine next to its manifest", () => {
+    const registry = createGameRegistry();
+    const engine = { manifest: rps } as GameEngine;
+
+    registry.registerEngine(engine);
+
+    expect(registry.get("rps")).toEqual(rps);
+    expect(registry.getEngine("rps")).toBe(engine);
   });
 });

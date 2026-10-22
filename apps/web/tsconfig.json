@@ -19,6 +19,7 @@
     "forceConsistentCasingInFileNames": true,
     "paths": {
       "@/*": ["./src/*"],
+      "@game-platform/game-rps": ["../../packages/games/rps/src/index.ts"],
       "@game-platform/shared": ["../../packages/shared/src/index.ts"]
     }
   },
