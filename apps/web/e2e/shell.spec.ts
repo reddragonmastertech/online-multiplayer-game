@@ -18,6 +18,13 @@ test("lobby is game-first", async ({ page }) => {
   await expect(page.getByText("No public matches are live right now.")).toBeVisible();
 });
 
+test("join now asks guests to log in", async ({ page }) => {
+  await page.goto("/games/rps");
+
+  await page.getByRole("button", { name: "JOIN NOW" }).click();
+  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+});
+
 test("other sections stay blank", async ({ page }) => {
   await page.goto("/play");
 

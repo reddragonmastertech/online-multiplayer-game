@@ -7,18 +7,23 @@ import type {
 } from "@game-platform/shared";
 import Fastify from "fastify";
 import { Server } from "socket.io";
+import { attachSocketAuth } from "./auth/socket";
+import { registerAuthRoutes } from "./auth/routes";
 import type { AppConfig } from "./config";
+import { createDatabase, resolveSqlitePath } from "./db/client";
 import { registerGames } from "./games/register";
 
 export async function buildServer(config: AppConfig) {
   const app = Fastify({ logger: true });
   const registry = createGameRegistry();
+  const db = createDatabase(config.databaseUrl);
 
   registerGames(registry);
 
   await app.register(cors, { origin: config.webOrigin });
 
   app.get("/health", async () => ({ status: "ok" }));
+  registerAuthRoutes(app, { db, jwtSecret: config.jwtSecret });
 
   const io = new Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>(
     app.server,
@@ -27,14 +32,20 @@ export async function buildServer(config: AppConfig) {
     },
   );
 
+  attachSocketAuth(io, config.jwtSecret);
+
   app.addHook("onClose", async () => {
     await io.close();
+    db.close();
   });
 
   app.log.info(
-    { games: registry.list().map((game) => game.id) },
+    {
+      games: registry.list().map((game) => game.id),
+      sqlite: resolveSqlitePath(config.databaseUrl),
+    },
     "game modules registered",
   );
 
-  return { app, io, registry };
+  return { app, io, registry, db };
 }

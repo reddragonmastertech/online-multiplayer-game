@@ -16,6 +16,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
   WEB_ORIGIN: z.string().url().default("http://localhost:5173"),
   DATABASE_URL: optionalText,
+  JWT_SECRET: optionalText,
   REDIS_URL: optionalText,
   SUPABASE_URL: optionalUrl,
   SUPABASE_ANON_KEY: optionalText,
@@ -28,14 +29,22 @@ export type AppConfig = {
   port: number;
   webOrigin: string;
   databaseUrl?: string;
+  jwtSecret: string;
   redisUrl?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
   sentryDsn?: string;
 };
 
+const DEV_JWT_SECRET = "arena-dev-jwt-secret-change-me";
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = envSchema.parse(env);
+  const jwtSecret = parsed.JWT_SECRET ?? (parsed.NODE_ENV === "production" ? undefined : DEV_JWT_SECRET);
+
+  if (!jwtSecret) {
+    throw new Error("JWT_SECRET is required in production");
+  }
 
   return {
     nodeEnv: parsed.NODE_ENV,
@@ -43,6 +52,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     port: parsed.PORT,
     webOrigin: parsed.WEB_ORIGIN,
     databaseUrl: parsed.DATABASE_URL,
+    jwtSecret,
     redisUrl: parsed.REDIS_URL,
     supabaseUrl: parsed.SUPABASE_URL,
     supabaseAnonKey: parsed.SUPABASE_ANON_KEY,

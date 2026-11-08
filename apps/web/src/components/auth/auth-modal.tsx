@@ -1,6 +1,9 @@
 import { X } from "lucide-react";
-import { useEffect, type InputHTMLAttributes } from "react";
+import { useEffect, useState, type FormEvent, type InputHTMLAttributes } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { ApiRequestError } from "@/lib/api";
+import { useSessionStore } from "@/stores/session-store";
 import { useUiStore, type AuthTab } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 
@@ -29,12 +32,35 @@ const tabs: { id: AuthTab; label: string }[] = [
   { id: "signup", label: "Sign up" },
 ];
 
+function errorMessage(error: unknown) {
+  if (error instanceof ApiRequestError) {
+    return error.message;
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Something went wrong. Try again.";
+}
+
 export function AuthModal() {
   const open = useUiStore((state) => state.authOpen);
   const tab = useUiStore((state) => state.authTab);
   const closeAuth = useUiStore((state) => state.closeAuth);
   const setAuthTab = useUiStore((state) => state.setAuthTab);
-  const login = tab === "login";
+  const signup = useSessionStore((state) => state.signup);
+  const login = useSessionStore((state) => state.login);
+  const navigate = useNavigate();
+  const pathname = useLocation().pathname;
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const isLogin = tab === "login";
+
+  useEffect(() => {
+    setError(null);
+    setPending(false);
+  }, [tab, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -52,6 +78,37 @@ export function AuthModal() {
       document.body.style.overflow = previous;
     };
   }, [open, closeAuth]);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") ?? "");
+    const password = String(form.get("password") ?? "");
+
+    setPending(true);
+    setError(null);
+
+    try {
+      if (isLogin) {
+        await login({ email, password });
+      } else {
+        await signup({
+          name: String(form.get("name") ?? ""),
+          email,
+          password,
+        });
+      }
+
+      closeAuth();
+      if (pathname === "/login" || pathname === "/signup") {
+        void navigate("/lobby");
+      }
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setPending(false);
+    }
+  }
 
   if (!open) return null;
 
@@ -83,10 +140,12 @@ export function AuthModal() {
           id="auth-title"
           className="mt-2 text-center font-[Rajdhani,Inter,sans-serif] text-3xl font-bold tracking-wide"
         >
-          {login ? "Welcome back" : "Create your account"}
+          {isLogin ? "Welcome back" : "Create your account"}
         </h2>
         <p className="mt-1 text-center text-sm text-muted-foreground">
-          {login ? "Log in to join your next match." : "Pick a display name to enter the lobby."}
+          {isLogin
+            ? "Log in to join your next match."
+            : "New players start with 100 RAC."}
         </p>
 
         <div className="mt-5 grid grid-cols-2 rounded-full bg-black/40 p-1">
@@ -106,9 +165,18 @@ export function AuthModal() {
           ))}
         </div>
 
-        <form key={tab} className="mt-5 space-y-3" onSubmit={(event) => event.preventDefault()}>
-          {login ? null : (
-            <Field id="auth-name" label="DISPLAY NAME" name="name" placeholder="NovaAce" autoComplete="username" />
+        <form key={tab} className="mt-5 space-y-3" onSubmit={onSubmit}>
+          {isLogin ? null : (
+            <Field
+              id="auth-name"
+              label="DISPLAY NAME"
+              name="name"
+              placeholder="NovaAce"
+              autoComplete="username"
+              required
+              minLength={2}
+              maxLength={24}
+            />
           )}
           <Field
             id="auth-email"
@@ -118,20 +186,26 @@ export function AuthModal() {
             placeholder="you@example.com"
             autoComplete="email"
             autoFocus
+            required
           />
           <Field
             id="auth-password"
             label="PASSWORD"
             name="password"
             type="password"
-            placeholder="Enter your password"
-            autoComplete={login ? "current-password" : "new-password"}
+            placeholder="At least 8 characters"
+            autoComplete={isLogin ? "current-password" : "new-password"}
+            required
+            minLength={8}
+            maxLength={128}
           />
-          {login ? (
-            <p className="text-xs text-muted-foreground">Password reset will ship with the auth backend.</p>
+          {error ? (
+            <p className="text-sm text-danger" role="alert">
+              {error}
+            </p>
           ) : null}
-          <Button type="submit" className="mt-2 w-full" size="lg">
-            {login ? "Log in" : "Create account"}
+          <Button type="submit" className="mt-2 w-full" size="lg" disabled={pending}>
+            {pending ? "Please wait…" : isLogin ? "Log in" : "Create account"}
           </Button>
         </form>
       </div>

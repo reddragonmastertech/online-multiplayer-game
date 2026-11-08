@@ -12,5 +12,8 @@ blob-report
 .DS_Store
 Thumbs.db
 *.tsbuildinfo
+*.db
+*.db-wal
+*.db-shm
 docs
 .cursor

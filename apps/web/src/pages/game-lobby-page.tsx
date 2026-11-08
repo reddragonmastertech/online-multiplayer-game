@@ -1,10 +1,12 @@
 import { MATCH_RULES } from "@game-platform/shared";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { GameArt } from "@/components/catalog/game-art";
 import { MatchClosed } from "@/components/match/match-closed";
 import { Button } from "@/components/ui/button";
 import { findCatalogGame } from "@/lib/catalog";
+import { racAvailable, useSessionStore } from "@/stores/session-store";
+import { useUiStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 
 const modes = [
@@ -19,6 +21,15 @@ export function GameLobbyPage() {
   const game = findCatalogGame(gameId);
   const [mode, setMode] = useState<(typeof modes)[number]["id"]>("first-to-2");
   const [searching, setSearching] = useState(false);
+  const user = useSessionStore((state) => state.user);
+  const wallets = useSessionStore((state) => state.wallets);
+  const openAuth = useUiStore((state) => state.openAuth);
+
+  useEffect(() => {
+    if (!user) {
+      setSearching(false);
+    }
+  }, [user]);
 
   if (!game) {
     return <MatchClosed title="Game not found" detail="That game is not in the catalog." backTo="/lobby" />;
@@ -106,8 +117,8 @@ export function GameLobbyPage() {
               <div className="mt-6 rounded-2xl border border-border bg-card p-5">
                 <p className="font-semibold">Looking for an opponent…</p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Online pairing is not live yet, so this search cannot find a human player. Practice
-                  against the CPU is labeled as a bot.
+                  You are signed in, but online pairing is not live yet, so this search cannot find a
+                  human player. Practice against the CPU is labeled as a bot.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <Button asChild>
@@ -123,14 +134,27 @@ export function GameLobbyPage() {
                 <Button
                   size="lg"
                   disabled={!selected?.live}
-                  onClick={() => setSearching(true)}
+                  onClick={() => {
+                    if (!user) {
+                      openAuth("login");
+                      return;
+                    }
+                    setSearching(true);
+                  }}
                 >
-                  Find Opponent
+                  JOIN NOW
                 </Button>
                 <Button size="lg" variant="secondary" asChild>
                   <Link to="/vs/1-rac">Practice vs CPU</Link>
                 </Button>
               </div>
+            )}
+            {user ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Signed in as {user.name} · {racAvailable(wallets)} RAC
+              </p>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">Log in to use JOIN NOW.</p>
             )}
           </div>
 

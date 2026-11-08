@@ -2,6 +2,7 @@ import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { racAvailable, useSessionStore } from "@/stores/session-store";
 import { useUiStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 
@@ -24,8 +25,62 @@ export function BrandLink() {
   );
 }
 
-export function SiteHeader() {
+function AuthActions({ onNavigate }: { onNavigate?: () => void }) {
   const openAuth = useUiStore((state) => state.openAuth);
+  const user = useSessionStore((state) => state.user);
+  const wallets = useSessionStore((state) => state.wallets);
+  const logout = useSessionStore((state) => state.logout);
+
+  if (user) {
+    return (
+      <>
+        <Link
+          to="/account"
+          onClick={onNavigate}
+          className="flex min-w-0 items-center gap-3 rounded-full border border-border px-3 py-1.5 hover:bg-elevated"
+        >
+          <span className="truncate text-sm font-semibold">{user.name}</span>
+          <span className="font-[Rajdhani,Inter,sans-serif] text-sm font-bold text-primary">
+            {racAvailable(wallets)} RAC
+          </span>
+        </Link>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            logout();
+            onNavigate?.();
+          }}
+        >
+          Log out
+        </Button>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Button
+        variant="secondary"
+        onClick={() => {
+          onNavigate?.();
+          openAuth("login");
+        }}
+      >
+        Log in
+      </Button>
+      <Button
+        onClick={() => {
+          onNavigate?.();
+          openAuth("signup");
+        }}
+      >
+        Get Started
+      </Button>
+    </>
+  );
+}
+
+export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -51,10 +106,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto hidden items-center gap-2 md:flex">
-          <Button variant="secondary" onClick={() => openAuth("login")}>
-            Log in
-          </Button>
-          <Button onClick={() => openAuth("signup")}>Get Started</Button>
+          <AuthActions />
         </div>
 
         <Button
@@ -82,13 +134,8 @@ export function SiteHeader() {
               </NavLink>
             ))}
           </nav>
-          <div className="mt-3 flex gap-2">
-            <Button className="flex-1" variant="secondary" onClick={() => openAuth("login")}>
-              Log in
-            </Button>
-            <Button className="flex-1" onClick={() => openAuth("signup")}>
-              Get Started
-            </Button>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <AuthActions onNavigate={() => setMenuOpen(false)} />
           </div>
         </div>
       ) : null}
