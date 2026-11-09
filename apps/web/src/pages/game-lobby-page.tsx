@@ -1,6 +1,6 @@
 import { MATCH_RULES, type QueueEntry } from "@game-platform/shared";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { GameArt } from "@/components/catalog/game-art";
 import { MatchClosed } from "@/components/match/match-closed";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ function useElapsedSeconds(since: string | null) {
 
 export function GameLobbyPage() {
   const { gameId = "" } = useParams();
+  const navigate = useNavigate();
   const game = findCatalogGame(gameId);
   const [mode, setMode] = useState<(typeof modes)[number]["id"]>("first-to-2");
   const [stake, setStake] = useState<number>(MATCH_RULES.racStakes[0]);
@@ -49,8 +50,7 @@ export function GameLobbyPage() {
   const queueStatus = useQueueStore((state) => state.status);
   const queuedAt = useQueueStore((state) => state.queuedAt);
   const queueError = useQueueStore((state) => state.error);
-  const foundMatch = useQueueStore((state) => state.match);
-  const foundSeat = useQueueStore((state) => state.seat);
+  const foundMatchId = useQueueStore((state) => state.matchId);
   const joinQueue = useQueueStore((state) => state.join);
   const leaveQueue = useQueueStore((state) => state.leave);
   const resetQueue = useQueueStore((state) => state.reset);
@@ -61,6 +61,13 @@ export function GameLobbyPage() {
   useEffect(() => {
     if (!user) resetQueue();
   }, [user, resetQueue]);
+
+  // The server has already seated both players and started their clock.
+  useEffect(() => {
+    if (queueStatus !== "found" || !foundMatchId) return;
+    resetQueue();
+    void navigate(`/room/${foundMatchId}`, { replace: true });
+  }, [queueStatus, foundMatchId, navigate, resetQueue]);
 
   if (!game) {
     return <MatchClosed title="Game not found" detail="That game is not in the catalog." backTo="/lobby" />;
@@ -83,7 +90,7 @@ export function GameLobbyPage() {
   const selected = modes.find((item) => item.id === mode);
   const canAffordStake = available >= stake;
   const searching = queueStatus === "searching";
-  const found = queueStatus === "found" && foundMatch;
+  const found = queueStatus === "found";
 
   const blockedReason = !user
     ? "Log in to use JOIN NOW."
@@ -199,34 +206,7 @@ export function GameLobbyPage() {
             {found ? (
               <div className="mt-6 rounded-2xl border border-primary bg-elevated p-5">
                 <p className="font-semibold">Opponent found</p>
-                <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-                  {foundMatch.players.map((player) => (
-                    <div
-                      key={player.userId}
-                      className={cn(
-                        "rounded-xl border p-3",
-                        player.seat === foundSeat ? "border-primary bg-card" : "border-border bg-card",
-                      )}
-                    >
-                      <dt className="text-xs font-semibold tracking-[0.14em] text-muted-foreground">
-                        SEAT {player.seat.toUpperCase()}
-                        {player.seat === foundSeat ? " · YOU" : ""}
-                      </dt>
-                      <dd className="mt-1 truncate font-semibold">{player.name}</dd>
-                    </div>
-                  ))}
-                </dl>
-                <p className="mt-3 text-sm text-muted-foreground">
-                  {foundMatch.stake} RAC locked each · pot {foundMatch.pot} RAC · first to{" "}
-                  {foundMatch.firstTo}
-                </p>
-                <p className="mt-3 text-sm text-muted-foreground">
-                  The live board is not wired up yet, so this match will not start. Your stake is
-                  returned when the server restarts.
-                </p>
-                <Button className="mt-4" variant="secondary" onClick={resetQueue}>
-                  Back to stakes
-                </Button>
+                <p className="mt-2 text-sm text-muted-foreground">Opening the match room…</p>
               </div>
             ) : searching ? (
               <div className="mt-6 rounded-2xl border border-border bg-card p-5">

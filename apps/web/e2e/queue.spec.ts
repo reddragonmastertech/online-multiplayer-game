@@ -49,12 +49,13 @@ test("two browsers pair on the same stake and both lock 1 RAC", async ({ browser
     await stakeTile(bobPage, 1).click();
     await bobPage.getByRole("button", { name: "JOIN NOW" }).click();
 
-    // Both sides are seated against each other.
-    await expect(alicePage.getByText("Opponent found")).toBeVisible();
-    await expect(bobPage.getByText("Opponent found")).toBeVisible();
+    // Both sides are seated in the same room, facing each other.
+    await expect(alicePage).toHaveURL(/\/room\//);
+    await expect(bobPage).toHaveURL(/\/room\//);
+    expect(new URL(alicePage.url()).pathname).toBe(new URL(bobPage.url()).pathname);
+
     await expect(alicePage.getByText(`Bob${stamp}`)).toBeVisible();
-    await expect(bobPage.getByText(`Alice${stamp}`)).toBeVisible();
-    await expect(alicePage.getByText("pot 2 RAC")).toBeVisible();
+    await expect(alicePage.getByText("Pot 2 RAC")).toBeVisible();
 
     // Both stakes left available on both clients.
     await expect(

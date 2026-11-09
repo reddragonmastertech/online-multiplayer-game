@@ -127,3 +127,89 @@ export function refundRacStake(
     return wallet ? ({ ok: true, wallet } as const) : ({ ok: false, reason: "no_wallet" } as const);
   });
 }
+
+export type SettlementResult = {
+  deltas: { userId: string; delta: number }[];
+};
+
+/**
+ * Settles a finished match in one transaction.
+ *
+ * Both players had `stake` locked at join. Each gets that stake unlocked, then
+ * the loser's stake moves to the winner. Net: winner +stake, loser -stake, and
+ * `locked` returns to zero for both. The unlock and the transfer are separate
+ * ledger lines so a loss is a visible row rather than an absent one.
+ */
+export function settleRacMatch(
+  db: AppDatabase,
+  params: {
+    matchId: string;
+    stake: number;
+    winnerUserId: string;
+    loserUserId: string;
+    now?: string;
+  },
+): SettlementResult {
+  const { matchId, stake, winnerUserId, loserUserId } = params;
+  const createdAt = params.now ?? new Date().toISOString();
+
+  return withTransaction(db, () => {
+    for (const userId of [winnerUserId, loserUserId]) {
+      const unlocked = db
+        .prepare(
+          `UPDATE wallets SET available = available + ?, locked = locked - ?
+           WHERE user_id = ? AND currency = 'rac' AND locked >= ?`,
+        )
+        .run(stake, stake, userId, stake);
+
+      if (Number(unlocked.changes) !== 1) {
+        throw new Error(`cannot settle ${matchId}: ${userId} has no ${stake} RAC locked`);
+      }
+
+      writeLedger(db, {
+        userId,
+        kind: ledgerKind.stakeRefund,
+        amount: stake,
+        matchId,
+        createdAt,
+      });
+    }
+
+    const taken = db
+      .prepare(
+        `UPDATE wallets SET available = available - ?
+         WHERE user_id = ? AND currency = 'rac' AND available >= ?`,
+      )
+      .run(stake, loserUserId, stake);
+
+    if (Number(taken.changes) !== 1) {
+      throw new Error(`cannot settle ${matchId}: ${loserUserId} cannot cover the stake`);
+    }
+
+    db.prepare(
+      "UPDATE wallets SET available = available + ? WHERE user_id = ? AND currency = 'rac'",
+    ).run(stake, winnerUserId);
+
+    writeLedger(db, {
+      userId: loserUserId,
+      kind: ledgerKind.payout,
+      amount: -stake,
+      matchId,
+      createdAt,
+    });
+    writeLedger(db, {
+      userId: winnerUserId,
+      kind: ledgerKind.payout,
+      amount: stake,
+      matchId,
+      createdAt,
+    });
+
+    return {
+      deltas: [
+        { userId: winnerUserId, delta: stake },
+        { userId: loserUserId, delta: -stake },
+      ],
+    };
+  });
+}

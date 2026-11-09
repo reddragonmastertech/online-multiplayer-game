@@ -1,6 +1,8 @@
 import {
   clientEvent,
   MATCH_RULES,
+  matchForfeitSchema,
+  matchMoveSchema,
   queueJoinSchema,
   serverEvent,
   type ClientToServerEvents,
@@ -13,6 +15,7 @@ import type { Server, Socket } from "socket.io";
 import type { AppDatabase } from "../db/client";
 import { lockRacStake, refundRacStake } from "../economy/wallet";
 import { createMatchQueue, type QueueTicket } from "./queue";
+import { createMatchRuntime, stateFor } from "./runtime";
 import { createQueuedMatch, matchRoom, toMatchSummary } from "./store";
 
 type ArenaServer = Server<
@@ -32,6 +35,7 @@ type ArenaSocket = Socket<
 type GatewayLogger = {
   info: (payload: Record<string, unknown>, message: string) => void;
   warn: (payload: Record<string, unknown>, message: string) => void;
+  error: (payload: Record<string, unknown>, message: string) => void;
 };
 
 export function registerMatchGateway(
@@ -40,6 +44,29 @@ export function registerMatchGateway(
 ) {
   const { db, log } = deps;
   const queue = createMatchQueue();
+
+  /** Every socket the user has open, so a second tab stays in sync. */
+  function socketsForUser(userId: string) {
+    return [...io.sockets.sockets.values()].filter((socket) => socket.data.userId === userId);
+  }
+
+  const runtime = createMatchRuntime({
+    db,
+    log,
+    emit: {
+      state: (userId, payload) => {
+        for (const socket of socketsForUser(userId)) {
+          socket.emit(serverEvent.matchState, payload);
+        }
+      },
+      reveal: (matchId, payload) => {
+        io.to(matchRoom(matchId)).emit(serverEvent.matchReveal, payload);
+      },
+      over: (matchId, payload) => {
+        io.to(matchRoom(matchId)).emit(serverEvent.matchOver, payload);
+      },
+    },
+  });
 
   function fail(socket: ArenaSocket, code: ErrorCode, message: string) {
     socket.emit(serverEvent.error, { code, message });
@@ -108,6 +135,19 @@ export function registerMatchGateway(
       "match found",
     );
 
+    // The clock starts only after both clients have been told where to go.
+    runtime.start({
+      matchId,
+      gameId: params.gameId,
+      mode: params.mode,
+      currency: params.currency,
+      stake: params.stake,
+      players: {
+        a: { userId: waiting.userId, name: waiting.name },
+        b: { userId: joined.userId, name: joined.name },
+      },
+    });
+
     return { seated: true as const, matchId };
   }
 
@@ -157,7 +197,68 @@ export function registerMatchGateway(
     });
   }
 
+  const rejectionMessage: Record<string, string> = {
+    match_not_found: "That match is over or does not exist.",
+    not_your_match: "You are not seated in that match.",
+    match_not_live: "That round is not accepting moves.",
+    already_moved: "You already locked a hand this round.",
+  };
+
   io.on("connection", (socket) => {
+    // A refresh or a brief drop lands here with a new socket id. Put the player
+    // back in their room and resend the authoritative state.
+    if (socket.data.userId) {
+      const match = runtime.attach(socket.data.userId);
+      if (match) {
+        void socket.join(matchRoom(match.matchId));
+        socket.emit(
+          serverEvent.matchState,
+          stateFor(match, socket.data.userId, Date.now()),
+        );
+      }
+    }
+
+    socket.on(clientEvent.matchMove, (payload) => {
+      if (!socket.data.userId) {
+        fail(socket, "unauthorized", "Log in to play.");
+        return;
+      }
+
+      const parsed = matchMoveSchema.safeParse(payload);
+      if (!parsed.success) {
+        fail(socket, "invalid_input", "That move is not valid.");
+        return;
+      }
+
+      const rejection = runtime.move(
+        socket.data.userId,
+        parsed.data.matchId,
+        parsed.data.hand,
+      );
+
+      if (rejection) {
+        fail(socket, rejection, rejectionMessage[rejection] ?? "That move was refused.");
+      }
+    });
+
+    socket.on(clientEvent.matchForfeit, (payload) => {
+      if (!socket.data.userId) {
+        fail(socket, "unauthorized", "Log in to play.");
+        return;
+      }
+
+      const parsed = matchForfeitSchema.safeParse(payload);
+      if (!parsed.success) {
+        fail(socket, "invalid_input", "That forfeit is not valid.");
+        return;
+      }
+
+      const rejection = runtime.forfeit(socket.data.userId, parsed.data.matchId);
+      if (rejection) {
+        fail(socket, rejection, rejectionMessage[rejection] ?? "That forfeit was refused.");
+      }
+    });
+
     socket.on(clientEvent.queueJoin, (payload) => {
       if (!socket.data.userId) {
         fail(socket, "unauthorized", "Log in to join a match.");
@@ -223,8 +324,19 @@ export function registerMatchGateway(
       if (ticket) {
         releaseTicket(ticket, "disconnect");
       }
+
+      if (!socket.data.userId) return;
+
+      // Only start the grace countdown once the user's last socket is gone, so
+      // closing a spare tab never forfeits a live match.
+      const remaining = socketsForUser(socket.data.userId).filter(
+        (open) => open.id !== socket.id,
+      );
+      if (remaining.length === 0) {
+        runtime.detach(socket.data.userId);
+      }
     });
   });
 
-  return queue;
+  return { queue, runtime };
 }

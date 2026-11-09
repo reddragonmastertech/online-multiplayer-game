@@ -68,6 +68,7 @@ export function RpsBoard({
                 type="button"
                 disabled={disabled}
                 onClick={() => onPick?.(hand)}
+                aria-label={hand}
                 aria-pressed={active}
                 className={cn(
                   "rounded-2xl border px-2 py-3 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#42DDCD] disabled:cursor-default disabled:opacity-60",

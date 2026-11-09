@@ -1,7 +1,57 @@
+import type { MatchHistoryEntry } from "@game-platform/shared";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { matchHistoryRequest } from "@/lib/api";
 import { racAvailable, useSessionStore } from "@/stores/session-store";
 import { useUiStore } from "@/stores/ui-store";
+
+function MatchHistory({ matches }: { matches: MatchHistoryEntry[] | null }) {
+  if (matches === null) {
+    return <p className="mt-3 text-sm text-muted-foreground">Loading match history…</p>;
+  }
+
+  if (matches.length === 0) {
+    return (
+      <p className="mt-3 text-sm text-muted-foreground">
+        No matches yet. Finished PvP matches will appear here.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="mt-3 divide-y divide-border">
+      {matches.map((match) => (
+        <li key={match.matchId} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3">
+          <span
+            className={
+              match.result === "win"
+                ? "text-sm font-semibold text-primary"
+                : "text-sm font-semibold text-muted-foreground"
+            }
+          >
+            {match.result === "win" ? "Win" : "Loss"}
+          </span>
+          <span className="text-sm">vs {match.opponentName}</span>
+          <span className="text-sm text-muted-foreground">
+            {match.yourScore}–{match.opponentScore}
+          </span>
+          {match.reason !== "completed" ? (
+            <span className="text-xs text-muted-foreground">
+              by {match.reason === "forfeit" ? "forfeit" : "disconnect"}
+            </span>
+          ) : null}
+          <span className="ml-auto text-sm font-semibold">
+            {match.delta > 0 ? `+${match.delta}` : match.delta} RAC
+          </span>
+          <span className="w-full text-xs text-muted-foreground">
+            {new Date(match.finishedAt).toLocaleString()} · {match.stake} RAC stake
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function AccountPage() {
   const user = useSessionStore((state) => state.user);
@@ -9,6 +59,27 @@ export function AccountPage() {
   const status = useSessionStore((state) => state.status);
   const logout = useSessionStore((state) => state.logout);
   const openAuth = useUiStore((state) => state.openAuth);
+  const [matches, setMatches] = useState<MatchHistoryEntry[] | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setMatches(null);
+      return;
+    }
+
+    let alive = true;
+    matchHistoryRequest()
+      .then((response) => {
+        if (alive) setMatches(response.matches);
+      })
+      .catch(() => {
+        if (alive) setMatches([]);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [user]);
 
   if (status === "boot") {
     return (
@@ -62,9 +133,9 @@ export function AccountPage() {
           </p>
         </section>
 
-        <section className="mt-4 rounded-3xl border border-dashed border-border bg-card p-6">
+        <section className="mt-4 rounded-3xl border border-border bg-card p-6">
           <h2 className="text-sm font-semibold tracking-[0.16em] text-muted-foreground">MATCH HISTORY</h2>
-          <p className="mt-3 text-sm text-muted-foreground">No matches yet. Live PvP history will appear here.</p>
+          <MatchHistory matches={matches} />
         </section>
 
         <Button className="mt-6" variant="secondary" onClick={logout}>

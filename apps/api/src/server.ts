@@ -41,9 +41,10 @@ export async function buildServer(config: AppConfig) {
     app.log.warn(released, "cancelled matches left unsettled by a previous process");
   }
 
-  const queue = registerMatchGateway(io, { db, log: app.log });
+  const { queue, runtime } = registerMatchGateway(io, { db, log: app.log });
 
   app.addHook("onClose", async () => {
+    runtime.stop();
     await io.close();
     db.close();
   });
@@ -56,5 +57,5 @@ export async function buildServer(config: AppConfig) {
     "game modules registered",
   );
 
-  return { app, io, registry, db, queue };
+  return { app, io, registry, db, queue, runtime };
 }

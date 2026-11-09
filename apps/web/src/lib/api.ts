@@ -2,6 +2,7 @@ import {
   apiPaths,
   type AuthSuccess,
   type LoginRequest,
+  type MatchHistoryResponse,
   type MeResponse,
   type SignupRequest,
 } from "@game-platform/shared";
@@ -78,4 +79,8 @@ export function loginRequest(body: LoginRequest) {
 
 export function meRequest() {
   return request<MeResponse>(apiPaths.me);
+}
+
+export function matchHistoryRequest() {
+  return request<MatchHistoryResponse>(apiPaths.matches);
 }

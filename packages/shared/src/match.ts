@@ -95,10 +95,22 @@ export const matchSummarySchema = z.object({
 });
 export type MatchSummary = z.infer<typeof matchSummarySchema>;
 
+export const roundLogEntrySchema = z.object({
+  round: z.number().int().positive(),
+  detail: z.string().min(1),
+});
+export type RoundLogEntry = z.infer<typeof roundLogEntrySchema>;
+
 export const matchStateSchema = matchSummarySchema.extend({
   viewerRole: viewerRoleSchema,
   yourUserId: userIdSchema.optional(),
   startedAt: isoDateSchema.optional(),
+  /**
+   * Rounds already resolved. Carried on the state so a player who reloads gets
+   * their history back instead of only seeing rounds played since they
+   * reconnected.
+   */
+  log: z.array(roundLogEntrySchema),
 });
 export type MatchState = z.infer<typeof matchStateSchema>;
 
@@ -133,3 +145,28 @@ export const matchOverSchema = z.object({
   ),
 });
 export type MatchOver = z.infer<typeof matchOverSchema>;
+
+export const matchResultSchema = z.enum(["win", "loss"]);
+export type MatchResult = z.infer<typeof matchResultSchema>;
+
+export const matchHistoryEntrySchema = z.object({
+  matchId: matchIdSchema,
+  gameId: playableGameIdSchema,
+  mode: playableRpsModeSchema,
+  currency: playableCurrencySchema,
+  stake: racAmountSchema,
+  result: matchResultSchema,
+  reason: matchOverReasonSchema,
+  opponentName: displayNameSchema,
+  yourScore: z.number().int().nonnegative(),
+  opponentScore: z.number().int().nonnegative(),
+  /** Net RAC change for this match: +stake on a win, -stake on a loss. */
+  delta: z.number().int(),
+  finishedAt: isoDateSchema,
+});
+export type MatchHistoryEntry = z.infer<typeof matchHistoryEntrySchema>;
+
+export const matchHistoryResponseSchema = z.object({
+  matches: z.array(matchHistoryEntrySchema),
+});
+export type MatchHistoryResponse = z.infer<typeof matchHistoryResponseSchema>;

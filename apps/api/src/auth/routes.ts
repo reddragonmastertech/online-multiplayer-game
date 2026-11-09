@@ -16,6 +16,7 @@ import {
   sendError,
   unauthorized,
 } from "../http/errors";
+import { loadMatchHistory } from "../match/history";
 import { readBearerToken, signAccessToken, verifyAccessToken } from "./jwt";
 import { hashPassword, verifyPassword } from "./password";
 import { findUserByEmail, loadAccount, toPublicUser, toPublicWallets } from "./session";
@@ -133,6 +134,18 @@ export function registerAuthRoutes(
         return sendError(reply, unauthorized());
       }
       return account;
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return sendError(reply, error);
+      }
+      throw error;
+    }
+  });
+
+  app.get(apiPaths.matches, async (request, reply) => {
+    try {
+      const payload = authenticate(request, jwtSecret);
+      return { matches: loadMatchHistory(db, payload.sub) };
     } catch (error) {
       if (error instanceof HttpError) {
         return sendError(reply, error);
