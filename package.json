@@ -11,6 +11,7 @@
     "dev:api": "pnpm --filter @game-platform/api dev",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
-    "build": "pnpm -r --if-present build"
+    "build": "pnpm -r --if-present build",
+    "start": "pnpm --filter @game-platform/web build && pnpm --filter @game-platform/api start"
   }
 }

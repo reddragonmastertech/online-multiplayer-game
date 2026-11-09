@@ -35,3 +35,7 @@ export function emailTaken() {
 export function invalidCredentials() {
   return new HttpError(401, "invalid_credentials", "Email or password is wrong.");
 }
+
+export function notFound(message = "That endpoint does not exist.") {
+  return new HttpError(404, "not_found", message);
+}

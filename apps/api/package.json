@@ -8,10 +8,12 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "start:e2e": "tsx --env-file=.env.e2e src/index.ts"
+    "start:e2e": "tsx --env-file=.env.e2e src/index.ts",
+    "start:served": "tsx --env-file=.env.served src/index.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",
+    "@fastify/static": "^10.1.10",
     "@game-platform/game-checkers": "workspace:*",
     "@game-platform/game-chess": "workspace:*",
     "@game-platform/game-core": "workspace:*",

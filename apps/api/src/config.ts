@@ -17,6 +17,8 @@ const envSchema = z.object({
   WEB_ORIGIN: z.string().url().default("http://localhost:5173"),
   DATABASE_URL: optionalText,
   JWT_SECRET: optionalText,
+  /** Overrides where the built web bundle is read from. */
+  WEB_DIST: optionalText,
   REDIS_URL: optionalText,
   SUPABASE_URL: optionalUrl,
   SUPABASE_ANON_KEY: optionalText,
@@ -30,6 +32,7 @@ export type AppConfig = {
   webOrigin: string;
   databaseUrl?: string;
   jwtSecret: string;
+  webDist?: string;
   redisUrl?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
@@ -53,6 +56,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webOrigin: parsed.WEB_ORIGIN,
     databaseUrl: parsed.DATABASE_URL,
     jwtSecret,
+    webDist: parsed.WEB_DIST,
     redisUrl: parsed.REDIS_URL,
     supabaseUrl: parsed.SUPABASE_URL,
     supabaseAnonKey: parsed.SUPABASE_ANON_KEY,

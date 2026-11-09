@@ -13,6 +13,7 @@ import { registerAuthRoutes } from "./auth/routes";
 import type { AppConfig } from "./config";
 import { createDatabase, resolveSqlitePath } from "./db/client";
 import { registerGames } from "./games/register";
+import { registerWebApp } from "./http/web";
 import { registerMatchGateway } from "./match/gateway";
 import { releaseUnsettledMatches } from "./match/store";
 
@@ -48,6 +49,10 @@ export async function buildServer(config: AppConfig) {
   // summary carries no hands, so there is nothing here to withhold.
   app.get(apiPaths.live, async () => ({ matches: runtime.list() }));
 
+  // Registered last so it never shadows an API route; its not-found handler is
+  // what turns client-side routes into the app shell.
+  const web = await registerWebApp(app, config.webDist);
+
   app.addHook("onClose", async () => {
     runtime.stop();
     await io.close();
@@ -58,9 +63,10 @@ export async function buildServer(config: AppConfig) {
     {
       games: registry.list().map((game) => game.id),
       sqlite: resolveSqlitePath(config.databaseUrl),
+      web: web.served ? web.root : "not built; run the web dev server instead",
     },
     "game modules registered",
   );
 
-  return { app, io, registry, db, queue, runtime };
+  return { app, io, registry, db, queue, runtime, web };
 }

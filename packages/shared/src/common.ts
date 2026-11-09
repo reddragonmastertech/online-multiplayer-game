@@ -18,6 +18,7 @@ export type IsoDate = z.infer<typeof isoDateSchema>;
 export const errorCodeSchema = z.enum([
   "unauthorized",
   "invalid_input",
+  "not_found",
   "email_taken",
   "invalid_credentials",
   "insufficient_balance",
