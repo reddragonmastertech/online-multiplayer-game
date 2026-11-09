@@ -12,6 +12,8 @@ import { registerAuthRoutes } from "./auth/routes";
 import type { AppConfig } from "./config";
 import { createDatabase, resolveSqlitePath } from "./db/client";
 import { registerGames } from "./games/register";
+import { registerMatchGateway } from "./match/gateway";
+import { releaseUnsettledMatches } from "./match/store";
 
 export async function buildServer(config: AppConfig) {
   const app = Fastify({ logger: true });
@@ -34,6 +36,13 @@ export async function buildServer(config: AppConfig) {
 
   attachSocketAuth(io, config.jwtSecret);
 
+  const released = releaseUnsettledMatches(db);
+  if (released.matches > 0) {
+    app.log.warn(released, "cancelled matches left unsettled by a previous process");
+  }
+
+  const queue = registerMatchGateway(io, { db, log: app.log });
+
   app.addHook("onClose", async () => {
     await io.close();
     db.close();
@@ -47,5 +56,5 @@ export async function buildServer(config: AppConfig) {
     "game modules registered",
   );
 
-  return { app, io, registry, db };
+  return { app, io, registry, db, queue };
 }

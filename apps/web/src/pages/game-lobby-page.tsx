@@ -1,4 +1,4 @@
-import { MATCH_RULES } from "@game-platform/shared";
+import { MATCH_RULES, type QueueEntry } from "@game-platform/shared";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { GameArt } from "@/components/catalog/game-art";
@@ -6,6 +6,7 @@ import { MatchClosed } from "@/components/match/match-closed";
 import { Button } from "@/components/ui/button";
 import { findCatalogGame } from "@/lib/catalog";
 import { racAvailable, useSessionStore } from "@/stores/session-store";
+import { useQueueStore } from "@/stores/queue-store";
 import { useUiStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 
@@ -16,20 +17,50 @@ const modes = [
   { id: "private", title: "Private Room", detail: "Invite a friend. Not on this build.", live: false },
 ] as const;
 
+function useElapsedSeconds(since: string | null) {
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!since) {
+      setSeconds(0);
+      return;
+    }
+
+    const started = new Date(since).getTime();
+    const tick = () => setSeconds(Math.max(0, Math.round((Date.now() - started) / 1000)));
+
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [since]);
+
+  return seconds;
+}
+
 export function GameLobbyPage() {
   const { gameId = "" } = useParams();
   const game = findCatalogGame(gameId);
   const [mode, setMode] = useState<(typeof modes)[number]["id"]>("first-to-2");
-  const [searching, setSearching] = useState(false);
+  const [stake, setStake] = useState<number>(MATCH_RULES.racStakes[0]);
   const user = useSessionStore((state) => state.user);
   const wallets = useSessionStore((state) => state.wallets);
   const openAuth = useUiStore((state) => state.openAuth);
 
+  const queueStatus = useQueueStore((state) => state.status);
+  const queuedAt = useQueueStore((state) => state.queuedAt);
+  const queueError = useQueueStore((state) => state.error);
+  const foundMatch = useQueueStore((state) => state.match);
+  const foundSeat = useQueueStore((state) => state.seat);
+  const joinQueue = useQueueStore((state) => state.join);
+  const leaveQueue = useQueueStore((state) => state.leave);
+  const resetQueue = useQueueStore((state) => state.reset);
+
+  const elapsed = useElapsedSeconds(queueStatus === "searching" ? queuedAt : null);
+  const available = racAvailable(wallets);
+
   useEffect(() => {
-    if (!user) {
-      setSearching(false);
-    }
-  }, [user]);
+    if (!user) resetQueue();
+  }, [user, resetQueue]);
 
   if (!game) {
     return <MatchClosed title="Game not found" detail="That game is not in the catalog." backTo="/lobby" />;
@@ -50,6 +81,33 @@ export function GameLobbyPage() {
   }
 
   const selected = modes.find((item) => item.id === mode);
+  const canAffordStake = available >= stake;
+  const searching = queueStatus === "searching";
+  const found = queueStatus === "found" && foundMatch;
+
+  const blockedReason = !user
+    ? "Log in to use JOIN NOW."
+    : !selected?.live
+      ? "That mode is not on this build."
+      : !canAffordStake
+        ? `You need ${stake} RAC available. You have ${available} RAC.`
+        : null;
+
+  function handleJoin() {
+    if (!user) {
+      openAuth("login");
+      return;
+    }
+
+    const entry: QueueEntry = {
+      gameId: "rps",
+      mode: "first-to-2",
+      currency: "rac",
+      stake,
+    };
+
+    joinQueue(entry);
+  }
 
   return (
     <div className="min-h-full overflow-y-auto">
@@ -80,17 +138,14 @@ export function GameLobbyPage() {
                 <button
                   key={item.id}
                   type="button"
-                  disabled={!item.live}
-                  onClick={() => {
-                    setMode(item.id);
-                    setSearching(false);
-                  }}
+                  disabled={!item.live || searching}
+                  onClick={() => setMode(item.id)}
                   className={cn(
                     "rounded-2xl border p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     mode === item.id && item.live
                       ? "border-primary bg-elevated"
                       : "border-border bg-card",
-                    !item.live && "opacity-60",
+                    (!item.live || searching) && "opacity-60",
                   )}
                 >
                   <p className="font-semibold">{item.title}</p>
@@ -102,46 +157,95 @@ export function GameLobbyPage() {
               ))}
             </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-primary bg-elevated p-4">
-                <p className="font-semibold">Free Play</p>
-                <p className="mt-1 text-sm text-muted-foreground">Casual matches. No stake.</p>
-              </div>
-              <div className="rounded-2xl border border-border bg-card p-4 opacity-70">
-                <p className="font-semibold">Paid Matches</p>
-                <p className="mt-1 text-sm text-muted-foreground">Not available on this build.</p>
-              </div>
+            <h2 className="mt-8 text-sm font-semibold tracking-[0.16em] text-muted-foreground">
+              CHOOSE YOUR STAKE
+            </h2>
+            <div
+              className="mt-3 grid gap-3 sm:grid-cols-3"
+              role="radiogroup"
+              aria-label="RAC stake"
+            >
+              {MATCH_RULES.racStakes.map((amount) => (
+                <button
+                  key={amount}
+                  type="button"
+                  role="radio"
+                  aria-checked={stake === amount}
+                  disabled={searching}
+                  onClick={() => setStake(amount)}
+                  className={cn(
+                    "rounded-2xl border p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    stake === amount ? "border-primary bg-elevated" : "border-border bg-card",
+                    searching && "opacity-60",
+                  )}
+                >
+                  <p className="font-[Rajdhani,Inter,sans-serif] text-2xl font-bold">
+                    {amount} RAC
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Winner takes {amount * 2} RAC
+                  </p>
+                  {user && available < amount ? (
+                    <p className="mt-2 text-xs font-semibold text-danger">Not enough RAC</p>
+                  ) : null}
+                </button>
+              ))}
             </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              RAC is play-only arena credit. It has no cash value and cannot be withdrawn. Joining
+              locks your stake until the match settles; leaving the queue returns it.
+            </p>
 
-            {searching ? (
+            {found ? (
+              <div className="mt-6 rounded-2xl border border-primary bg-elevated p-5">
+                <p className="font-semibold">Opponent found</p>
+                <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {foundMatch.players.map((player) => (
+                    <div
+                      key={player.userId}
+                      className={cn(
+                        "rounded-xl border p-3",
+                        player.seat === foundSeat ? "border-primary bg-card" : "border-border bg-card",
+                      )}
+                    >
+                      <dt className="text-xs font-semibold tracking-[0.14em] text-muted-foreground">
+                        SEAT {player.seat.toUpperCase()}
+                        {player.seat === foundSeat ? " · YOU" : ""}
+                      </dt>
+                      <dd className="mt-1 truncate font-semibold">{player.name}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {foundMatch.stake} RAC locked each · pot {foundMatch.pot} RAC · first to{" "}
+                  {foundMatch.firstTo}
+                </p>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  The live board is not wired up yet, so this match will not start. Your stake is
+                  returned when the server restarts.
+                </p>
+                <Button className="mt-4" variant="secondary" onClick={resetQueue}>
+                  Back to stakes
+                </Button>
+              </div>
+            ) : searching ? (
               <div className="mt-6 rounded-2xl border border-border bg-card p-5">
                 <p className="font-semibold">Looking for an opponent…</p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  You are signed in, but online pairing is not live yet, so this search cannot find a
-                  human player. Practice against the CPU is labeled as a bot.
+                  {stake} RAC locked · searching for {elapsed}s
                 </p>
                 <div className="mt-4 flex flex-wrap gap-3">
-                  <Button asChild>
-                    <Link to="/vs/1-rac">Practice vs CPU</Link>
-                  </Button>
-                  <Button variant="secondary" onClick={() => setSearching(false)}>
+                  <Button variant="secondary" onClick={leaveQueue}>
                     Cancel Search
+                  </Button>
+                  <Button variant="ghost" asChild>
+                    <Link to="/vs/1-rac">Practice vs CPU instead</Link>
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="mt-6 flex flex-wrap gap-3">
-                <Button
-                  size="lg"
-                  disabled={!selected?.live}
-                  onClick={() => {
-                    if (!user) {
-                      openAuth("login");
-                      return;
-                    }
-                    setSearching(true);
-                  }}
-                >
+                <Button size="lg" disabled={Boolean(user) && Boolean(blockedReason)} onClick={handleJoin}>
                   JOIN NOW
                 </Button>
                 <Button size="lg" variant="secondary" asChild>
@@ -149,9 +253,17 @@ export function GameLobbyPage() {
                 </Button>
               </div>
             )}
+
+            {queueError ? (
+              <p role="status" className="mt-3 text-sm font-semibold text-danger">
+                {queueError}
+              </p>
+            ) : null}
+
             {user ? (
               <p className="mt-3 text-sm text-muted-foreground">
-                Signed in as {user.name} · {racAvailable(wallets)} RAC
+                Signed in as {user.name} · {available} RAC available
+                {blockedReason && !searching && !found ? ` · ${blockedReason}` : ""}
               </p>
             ) : (
               <p className="mt-3 text-sm text-muted-foreground">Log in to use JOIN NOW.</p>

@@ -1,6 +1,7 @@
 import type { AuthSuccess, LoginRequest, SignupRequest, User, Wallet } from "@game-platform/shared";
 import { create } from "zustand";
 import { getStoredToken, loginRequest, meRequest, setStoredToken, signupRequest } from "@/lib/api";
+import { closeSocket } from "@/lib/socket";
 
 type SessionStatus = "boot" | "ready";
 
@@ -10,6 +11,7 @@ type SessionState = {
   user: User | null;
   wallets: Wallet[];
   hydrate: () => Promise<void>;
+  refresh: () => Promise<void>;
   signup: (body: SignupRequest) => Promise<void>;
   login: (body: LoginRequest) => Promise<void>;
   logout: () => void;
@@ -29,7 +31,7 @@ export function racAvailable(wallets: Wallet[]) {
   return wallets.find((wallet) => wallet.currency === "rac")?.available ?? 0;
 }
 
-export const useSessionStore = create<SessionState>((set) => ({
+export const useSessionStore = create<SessionState>((set, get) => ({
   status: "boot",
   token: null,
   user: null,
@@ -49,6 +51,17 @@ export const useSessionStore = create<SessionState>((set) => ({
       set({ status: "ready", token: null, user: null, wallets: [] });
     }
   },
+  /** Re-reads the authoritative wallet after the server moves RAC. */
+  refresh: async () => {
+    if (!get().token) return;
+
+    try {
+      const me = await meRequest();
+      set({ user: me.user, wallets: me.wallets });
+    } catch {
+      // Leave the last known balance in place; a failed refresh is not a logout.
+    }
+  },
   signup: async (body) => {
     set(applyAuth(await signupRequest(body)));
   },
@@ -57,6 +70,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   },
   logout: () => {
     setStoredToken(null);
+    closeSocket();
     set({ status: "ready", token: null, user: null, wallets: [] });
   },
 }));
