@@ -1,6 +1,7 @@
 import {
   apiPaths,
   type AuthSuccess,
+  type LiveMatchesResponse,
   type LoginRequest,
   type MatchHistoryResponse,
   type MeResponse,
@@ -83,4 +84,8 @@ export function meRequest() {
 
 export function matchHistoryRequest() {
   return request<MatchHistoryResponse>(apiPaths.matches);
+}
+
+export function liveMatchesRequest() {
+  return request<LiveMatchesResponse>(apiPaths.live);
 }

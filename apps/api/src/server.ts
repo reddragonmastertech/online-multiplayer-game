@@ -1,9 +1,10 @@
 import cors from "@fastify/cors";
 import { createGameRegistry } from "@game-platform/game-core";
-import type {
-  ClientToServerEvents,
-  ServerToClientEvents,
-  SocketData,
+import {
+  apiPaths,
+  type ClientToServerEvents,
+  type ServerToClientEvents,
+  type SocketData,
 } from "@game-platform/shared";
 import Fastify from "fastify";
 import { Server } from "socket.io";
@@ -42,6 +43,10 @@ export async function buildServer(config: AppConfig) {
   }
 
   const { queue, runtime } = registerMatchGateway(io, { db, log: app.log });
+
+  // Public: a visitor may browse matches in progress without an account. The
+  // summary carries no hands, so there is nothing here to withhold.
+  app.get(apiPaths.live, async () => ({ matches: runtime.list() }));
 
   app.addHook("onClose", async () => {
     runtime.stop();

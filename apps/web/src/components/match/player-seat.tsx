@@ -8,6 +8,22 @@ function moveLabel(move: MatchSeatView["move"]) {
   return move;
 }
 
+/** Derived from the arena name, so it claims nothing the player did not pick. */
+export function InitialsAvatar({ name, className }: { name: string; className?: string }) {
+  const initial = (name.trim()[0] ?? "?").toUpperCase();
+  const hue = [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360;
+
+  return (
+    <div
+      aria-hidden="true"
+      className={cn("grid place-items-center font-display text-4xl font-bold text-white", className)}
+      style={{ backgroundColor: `hsl(${hue} 42% 32%)` }}
+    >
+      {initial}
+    </div>
+  );
+}
+
 export function PlayerSeat({
   seat,
   align = "center",
@@ -24,15 +40,26 @@ export function PlayerSeat({
         align === "center" && "text-center",
       )}
     >
-      <Portrait
-        id={seat.avatar}
-        name={seat.name}
-        className={cn(
-          "size-20 rounded-2xl ring-2 ring-[#42DDCD]/70 sm:size-24",
-          align === "center" && "mx-auto",
-          align === "right" && "ml-auto",
-        )}
-      />
+      {seat.avatar === null ? (
+        <InitialsAvatar
+          name={seat.name}
+          className={cn(
+            "size-20 rounded-2xl ring-2 ring-[#42DDCD]/70 sm:size-24",
+            align === "center" && "mx-auto",
+            align === "right" && "ml-auto",
+          )}
+        />
+      ) : (
+        <Portrait
+          id={seat.avatar}
+          name={seat.name}
+          className={cn(
+            "size-20 rounded-2xl ring-2 ring-[#42DDCD]/70 sm:size-24",
+            align === "center" && "mx-auto",
+            align === "right" && "ml-auto",
+          )}
+        />
+      )}
       <p className="mt-3 truncate text-sm text-[#F5F8FD]">
         {seat.name}
         {seat.you ? <span className="ml-2 text-[10px] font-semibold tracking-wider text-[#42DDCD]">YOU</span> : null}

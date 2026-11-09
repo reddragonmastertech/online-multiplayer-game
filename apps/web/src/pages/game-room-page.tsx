@@ -1,4 +1,10 @@
-import { MATCH_RULES, type MatchPlayer, type MatchState, type RpsHand } from "@game-platform/shared";
+import {
+  MATCH_RULES,
+  type MatchOver,
+  type MatchPlayer,
+  type MatchState,
+  type RpsHand,
+} from "@game-platform/shared";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { GameSurface } from "@/components/match/game-surface";
@@ -8,7 +14,6 @@ import type { MatchMoveView, MatchSeatView, MatchView } from "@/components/match
 import { Button } from "@/components/ui/button";
 import { useMatchStore } from "@/stores/match-store";
 import { useSessionStore } from "@/stores/session-store";
-import { useUiStore } from "@/stores/ui-store";
 
 function moveView(player: MatchPlayer): MatchMoveView {
   if (player.move.status === "revealed") return player.move.hand;
@@ -19,8 +24,9 @@ function seatView(player: MatchPlayer, you: boolean): MatchSeatView {
   return {
     id: player.userId,
     name: player.name,
-    // Stable per-player portrait without inventing an avatar the user picked.
-    avatar: (player.userId.charCodeAt(0) + player.userId.charCodeAt(1)) % 70,
+    // No stock photo: profile avatars do not exist yet, and a random face
+    // beside a real arena name would misrepresent the person playing.
+    avatar: null,
     score: player.score,
     move: moveView(player),
     you,
@@ -34,11 +40,91 @@ function statusText(state: MatchState, you: MatchPlayer | undefined, finished: b
   return "Pick a hand";
 }
 
+/**
+ * Read-only view. The server already withholds unrevealed hands from
+ * spectators, and `role: "spectator"` means the board renders no controls.
+ */
+function SpectatorRoom({
+  state,
+  log,
+  over,
+}: {
+  state: MatchState;
+  log: MatchView["log"];
+  over: MatchOver | null;
+}) {
+  const [a, b] = state.players;
+
+  const view: MatchView = {
+    gameId: state.gameId,
+    gameName: "Rock Paper Scissors",
+    title: `${state.stake} RAC MATCH`,
+    modeLabel: `First to ${state.firstTo}`,
+    potLabel: `Pot ${state.pot} RAC`,
+    round: state.round,
+    firstTo: state.firstTo,
+    secondsLeft: state.secondsLeft,
+    showCountdown: state.status === "live",
+    status: over
+      ? `Winner ${over.winnerSeat === "a" ? a.name : b.name}`
+      : state.status === "reveal"
+        ? "Round result"
+        : "You’re watching this match",
+    role: "spectator",
+    left: seatView(a, false),
+    right: seatView(b, false),
+    log,
+    backTo: "/watch",
+    backLabel: "Watch",
+  };
+
+  return (
+    <div className="relative">
+      <MatchShell
+        view={view}
+        board={
+          <GameSurface
+            gameId={state.gameId}
+            role="spectator"
+            leftMove={view.left.move}
+            rightMove={view.right.move}
+          />
+        }
+      />
+      <div className="mx-auto max-w-6xl px-3 pb-6 text-center sm:px-4">
+        {over ? (
+          <section className="rounded-3xl border border-border bg-card p-6">
+            <h2 className="font-display text-2xl font-bold">Match finished</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {over.reason === "completed"
+                ? `Final score ${a.score}–${b.score}.`
+                : over.reason === "forfeit"
+                  ? "The match ended by forfeit."
+                  : "The match ended because a player disconnected."}
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-3">
+              <Button asChild>
+                <Link to="/watch">Watch another match</Link>
+              </Button>
+              <Button variant="secondary" asChild>
+                <Link to="/games/rps">Play yourself</Link>
+              </Button>
+            </div>
+          </section>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Hands stay hidden until both players have locked in.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function GameRoomPage() {
   const { matchId = "" } = useParams();
   const user = useSessionStore((state) => state.user);
   const sessionStatus = useSessionStore((state) => state.status);
-  const openAuth = useUiStore((state) => state.openAuth);
 
   const state = useMatchStore((store) => store.state);
   const over = useMatchStore((store) => store.over);
@@ -52,10 +138,12 @@ export function GameRoomPage() {
 
   const [confirmingExit, setConfirmingExit] = useState(false);
 
+  // Re-sent on login so a player who signs in gets their seat back rather than
+  // staying on the spectator view.
   useEffect(() => {
-    if (!matchId || !user) return;
+    if (!matchId || sessionStatus === "boot") return;
     watch(matchId);
-  }, [matchId, user, watch]);
+  }, [matchId, user, sessionStatus, watch]);
 
   useEffect(() => () => clear(), [clear]);
 
@@ -63,22 +151,6 @@ export function GameRoomPage() {
     return (
       <div className="grid h-full place-items-center p-6">
         <p className="text-sm text-muted-foreground">Loading match…</p>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="grid h-full place-items-center p-6">
-        <section className="max-w-md rounded-3xl border border-border bg-card p-8 text-center">
-          <h1 className="font-display text-3xl font-bold">Match room</h1>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Log in to rejoin your match. Spectating other people's matches is not available yet.
-          </p>
-          <Button className="mt-6" onClick={() => openAuth("login")}>
-            Log in
-          </Button>
-        </section>
       </div>
     );
   }
@@ -94,22 +166,21 @@ export function GameRoomPage() {
             {error ??
               "Waiting for the server to send this match. If it has already finished, it will not reopen."}
           </p>
-          <Button className="mt-6" variant="secondary" asChild>
-            <Link to="/games/rps">Back to RPS Lobby</Link>
-          </Button>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Button variant="secondary" asChild>
+              <Link to="/watch">Watch another match</Link>
+            </Button>
+            <Button asChild>
+              <Link to="/games/rps">Back to RPS Lobby</Link>
+            </Button>
+          </div>
         </section>
       </div>
     );
   }
 
-  if (state.viewerRole !== "player") {
-    return (
-      <MatchClosed
-        title="Not your match"
-        detail="You are not seated in this match, and spectating is not available yet."
-        backTo="/lobby"
-      />
-    );
+  if (state.viewerRole === "spectator") {
+    return <SpectatorRoom state={state} log={log} over={over} />;
   }
 
   const you = state.players.find((player) => player.userId === state.yourUserId);

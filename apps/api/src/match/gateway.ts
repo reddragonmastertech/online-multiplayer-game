@@ -3,6 +3,7 @@ import {
   MATCH_RULES,
   matchForfeitSchema,
   matchMoveSchema,
+  matchWatchSchema,
   queueJoinSchema,
   serverEvent,
   type ClientToServerEvents,
@@ -16,7 +17,7 @@ import type { AppDatabase } from "../db/client";
 import { lockRacStake, refundRacStake } from "../economy/wallet";
 import { createMatchQueue, type QueueTicket } from "./queue";
 import { createMatchRuntime, stateFor } from "./runtime";
-import { createQueuedMatch, matchRoom, toMatchSummary } from "./store";
+import { createQueuedMatch, matchRoom, spectatorRoom, toMatchSummary } from "./store";
 
 type ArenaServer = Server<
   ClientToServerEvents,
@@ -58,6 +59,9 @@ export function registerMatchGateway(
         for (const socket of socketsForUser(userId)) {
           socket.emit(serverEvent.matchState, payload);
         }
+      },
+      spectatorState: (matchId, payload) => {
+        io.to(spectatorRoom(matchId)).emit(serverEvent.matchState, payload);
       },
       reveal: (matchId, payload) => {
         io.to(matchRoom(matchId)).emit(serverEvent.matchReveal, payload);
@@ -257,6 +261,46 @@ export function registerMatchGateway(
       if (rejection) {
         fail(socket, rejection, rejectionMessage[rejection] ?? "That forfeit was refused.");
       }
+    });
+
+    socket.on(clientEvent.matchWatch, (payload) => {
+      const parsed = matchWatchSchema.safeParse(payload);
+      if (!parsed.success) {
+        fail(socket, "invalid_input", "That match id is not valid.");
+        return;
+      }
+
+      const match = runtime.get(parsed.data.matchId);
+      if (!match) {
+        fail(socket, "match_not_found", "That match is over or does not exist.");
+        return;
+      }
+
+      const isPlayer =
+        Boolean(socket.data.userId) &&
+        (match.players.a.userId === socket.data.userId ||
+          match.players.b.userId === socket.data.userId);
+
+      if (isPlayer) {
+        // A player asking to watch their own match is just rejoining it.
+        void socket.join(matchRoom(match.matchId));
+        socket.emit(serverEvent.matchState, stateFor(match, socket.data.userId, Date.now()));
+        return;
+      }
+
+      // Spectators get the match room for reveals and results, plus the
+      // spectator room for the view that hides unrevealed hands.
+      void socket.join(matchRoom(match.matchId));
+      void socket.join(spectatorRoom(match.matchId));
+      socket.emit(serverEvent.matchState, stateFor(match, null, Date.now()));
+    });
+
+    socket.on(clientEvent.matchUnwatch, (payload) => {
+      const parsed = matchWatchSchema.safeParse(payload);
+      if (!parsed.success) return;
+
+      void socket.leave(matchRoom(parsed.data.matchId));
+      void socket.leave(spectatorRoom(parsed.data.matchId));
     });
 
     socket.on(clientEvent.queueJoin, (payload) => {

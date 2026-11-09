@@ -1,10 +1,15 @@
 import { Link } from "react-router-dom";
 import { GameCard } from "@/components/catalog/game-card";
+import { LiveMatchGrid, useLiveMatches } from "@/components/catalog/live-match-list";
 import { SiteFooter } from "@/components/layout/site-footer";
-import { Button } from "@/components/ui/button";
 import { catalogGames } from "@/lib/catalog";
 
+/** The lobby previews a few matches; the full list lives at /watch. */
+const LOBBY_PREVIEW = 6;
+
 export function LobbyPage() {
+  const liveMatches = useLiveMatches();
+
   return (
     <div className="min-h-full overflow-y-auto">
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
@@ -27,16 +32,16 @@ export function LobbyPage() {
 
         <section className="mt-12">
           <div className="flex items-end justify-between gap-3">
-            <h2 className="font-[Rajdhani,Inter,sans-serif] text-2xl font-bold">Live matches</h2>
+            <h2 className="font-display text-2xl font-bold">Live matches</h2>
             <Link to="/watch" className="text-sm font-semibold text-primary">
               Watch directory
             </Link>
           </div>
-          <div className="mt-4 rounded-3xl border border-dashed border-border bg-card px-6 py-10 text-center">
-            <p className="text-sm text-muted-foreground">No public matches are live right now.</p>
-            <Button className="mt-4" asChild>
-              <Link to="/games/rps">Start Playing</Link>
-            </Button>
+          <div className="mt-4">
+            <LiveMatchGrid
+              matches={liveMatches?.slice(0, LOBBY_PREVIEW) ?? null}
+              emptyAction={{ to: "/games/rps", label: "Start Playing" }}
+            />
           </div>
         </section>
       </main>

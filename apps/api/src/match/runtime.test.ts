@@ -45,6 +45,7 @@ function harness() {
   });
 
   const states: { userId: string; payload: MatchState }[] = [];
+  const spectatorStates: MatchState[] = [];
   const reveals: MatchReveal[] = [];
   const overs: MatchOver[] = [];
 
@@ -55,6 +56,7 @@ function harness() {
     log: { info: () => {}, warn: () => {}, error: () => {} },
     emit: {
       state: (userId, payload) => states.push({ userId, payload }),
+      spectatorState: (_matchId, payload) => spectatorStates.push(payload),
       reveal: (_matchId, payload) => reveals.push(payload),
       over: (_matchId, payload) => overs.push(payload),
     },
@@ -88,7 +90,18 @@ function harness() {
     return [...states].reverse().find((entry) => entry.userId === userId)?.payload;
   }
 
-  return { db, runtime, matchId, states, reveals, overs, advance, playRound, latestFor };
+  return {
+    db,
+    runtime,
+    matchId,
+    states,
+    spectatorStates,
+    reveals,
+    overs,
+    advance,
+    playRound,
+    latestFor,
+  };
 }
 
 describe("match runtime", () => {
@@ -269,6 +282,48 @@ describe("match runtime", () => {
       opponentScore: 2,
       delta: -STAKE,
     });
+  });
+
+  it("hides both hands from spectators until the round resolves", () => {
+    h.runtime.move("alice", h.matchId, "Rock");
+    h.runtime.move("bob", h.matchId, "Scissors");
+
+    const duringChoosing = h.spectatorStates.filter((state) => state.status === "live");
+    for (const state of duringChoosing) {
+      expect(state.players.every((player) => player.move.status !== "revealed")).toBe(true);
+      expect(JSON.stringify(state)).not.toContain("Rock");
+      expect(JSON.stringify(state)).not.toContain("Scissors");
+    }
+
+    // Spectators are never told they are a player, and get no user id back.
+    expect(h.spectatorStates.every((state) => state.viewerRole === "spectator")).toBe(true);
+    expect(h.spectatorStates.every((state) => state.yourUserId === undefined)).toBe(true);
+  });
+
+  it("lists a live match publicly without exposing a hand", () => {
+    h.runtime.move("alice", h.matchId, "Paper");
+
+    const listed = h.runtime.list();
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({
+      matchId: h.matchId,
+      stake: STAKE,
+      pot: STAKE * 2,
+      round: 1,
+    });
+    expect(listed[0]?.players.map((player) => player.name)).toEqual([
+      "Player alice",
+      "Player bob",
+    ]);
+    expect(JSON.stringify(listed)).not.toContain("Paper");
+  });
+
+  it("drops a finished match out of the public list", () => {
+    h.playRound("Rock", "Scissors");
+    expect(h.runtime.list()).toHaveLength(1);
+
+    h.playRound("Rock", "Scissors");
+    expect(h.runtime.list()).toHaveLength(0);
   });
 
   it("counts down the round clock", () => {

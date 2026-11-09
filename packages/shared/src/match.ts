@@ -146,6 +146,32 @@ export const matchOverSchema = z.object({
 });
 export type MatchOver = z.infer<typeof matchOverSchema>;
 
+/**
+ * What a visitor may see about a match in progress. Deliberately excludes
+ * hands: a spectator learns that a player is locked in, never what they chose.
+ */
+export const liveMatchSummarySchema = z.object({
+  matchId: matchIdSchema,
+  gameId: playableGameIdSchema,
+  mode: playableRpsModeSchema,
+  currency: playableCurrencySchema,
+  stake: racAmountSchema,
+  pot: racAmountSchema,
+  round: z.number().int().positive(),
+  firstTo: z.number().int().positive(),
+  startedAt: isoDateSchema,
+  players: z.tuple([
+    z.object({ name: displayNameSchema, seat: seatSchema, score: z.number().int().nonnegative() }),
+    z.object({ name: displayNameSchema, seat: seatSchema, score: z.number().int().nonnegative() }),
+  ]),
+});
+export type LiveMatchSummary = z.infer<typeof liveMatchSummarySchema>;
+
+export const liveMatchesResponseSchema = z.object({
+  matches: z.array(liveMatchSummarySchema),
+});
+export type LiveMatchesResponse = z.infer<typeof liveMatchesResponseSchema>;
+
 export const matchResultSchema = z.enum(["win", "loss"]);
 export type MatchResult = z.infer<typeof matchResultSchema>;
 

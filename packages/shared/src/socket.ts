@@ -15,6 +15,9 @@ export const clientEvent = {
   queueLeave: "queue:leave",
   matchMove: "match:move",
   matchForfeit: "match:forfeit",
+  /** Read-only: subscribes a non-player to a public match's visible state. */
+  matchWatch: "match:watch",
+  matchUnwatch: "match:unwatch",
 } as const;
 
 export const serverEvent = {
@@ -43,6 +46,11 @@ export const matchForfeitSchema = z.object({
 });
 export type MatchForfeit = z.infer<typeof matchForfeitSchema>;
 
+export const matchWatchSchema = z.object({
+  matchId: matchIdSchema,
+});
+export type MatchWatch = z.infer<typeof matchWatchSchema>;
+
 export const queueWaitingSchema = queueEntrySchema.extend({
   queuedAt: z.string().min(1),
 });
@@ -60,6 +68,8 @@ export type ClientToServerEvents = {
   [clientEvent.queueLeave]: (payload?: QueueLeave) => void;
   [clientEvent.matchMove]: (payload: MatchMove) => void;
   [clientEvent.matchForfeit]: (payload: MatchForfeit) => void;
+  [clientEvent.matchWatch]: (payload: MatchWatch) => void;
+  [clientEvent.matchUnwatch]: (payload: MatchWatch) => void;
 };
 
 export type ServerToClientEvents = {

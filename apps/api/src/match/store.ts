@@ -15,6 +15,11 @@ export function matchRoom(matchId: string) {
   return `match:${matchId}`;
 }
 
+/** Spectators sit in their own room so they can be sent the restricted view. */
+export function spectatorRoom(matchId: string) {
+  return `match:${matchId}:watch`;
+}
+
 export type SeatAssignment = {
   seat: Seat;
   userId: string;

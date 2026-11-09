@@ -59,6 +59,64 @@ async function annWinsRound(alice: Page, bob: Page, round: number) {
   await expect(bob.getByText(`R${round}`, { exact: true })).toBeVisible();
 }
 
+/**
+ * Step 8's acceptance path, walked the way a stranger actually walks it:
+ * intro → lobby → game → sign up → JOIN NOW → play → lobby with a new balance.
+ */
+test("a stranger goes from the intro page to a finished match", async ({ browser }) => {
+  const stamp = Date.now() + 4;
+  const newcomerCtx = await browser.newContext();
+  const rivalCtx = await browser.newContext();
+  const newcomer = await newcomerCtx.newPage();
+  const rival = await rivalCtx.newPage();
+
+  try {
+    await newcomer.goto("/");
+    await newcomer.getByRole("link", { name: "Explore Games" }).click();
+    await expect(newcomer).toHaveURL(/\/lobby/);
+
+    await newcomer.getByRole("link", { name: "Play Now" }).first().click();
+    await expect(newcomer).toHaveURL(/\/games\/rps/);
+
+    // JOIN NOW asks a guest to authenticate, then returns them to the lobby.
+    await newcomer.getByRole("button", { name: "JOIN NOW" }).click();
+    const dialog = newcomer.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Sign up" }).click();
+    await dialog.getByLabel("DISPLAY NAME").fill(`New${stamp}`);
+    await dialog.getByLabel("EMAIL").fill(`new${stamp}@example.test`);
+    await dialog.getByLabel("PASSWORD").fill(password);
+    await dialog.getByRole("button", { name: "Create account" }).click();
+
+    await expect(dialog).toBeHidden();
+    await expect(newcomer).toHaveURL(/\/games\/rps/);
+    await balance(newcomer, `New${stamp}`, 100);
+
+    await newcomer.getByRole("button", { name: "JOIN NOW" }).click();
+    await expect(newcomer.getByText("Looking for an opponent…")).toBeVisible();
+
+    await signUp(rival, `Foe${stamp}`);
+    await rival.getByRole("button", { name: "JOIN NOW" }).click();
+    await newcomer.waitForURL(/\/room\//);
+
+    await newcomer.getByRole("button", { name: "Rock", exact: true }).click();
+    await rival.getByRole("button", { name: "Scissors", exact: true }).click();
+    await expect(newcomer.getByText("R1", { exact: true })).toBeVisible();
+    await newcomer.getByRole("button", { name: "Rock", exact: true }).click();
+    await rival.getByRole("button", { name: "Scissors", exact: true }).click();
+    await expect(newcomer.getByRole("heading", { name: "You won" })).toBeVisible();
+
+    // Back to the lobby, carrying the new balance.
+    await newcomer.getByRole("link", { name: "Back to RPS Lobby" }).click();
+    await expect(newcomer).toHaveURL(/\/games\/rps/);
+    await balance(newcomer, `New${stamp}`, 101);
+    await expect(newcomer.getByText("Signed in as New" + stamp, { exact: false })).toBeVisible();
+  } finally {
+    await newcomerCtx.close();
+    await rivalCtx.close();
+  }
+});
+
 test("two browsers play a match out and the winner gains the loser's stake", async ({ browser }) => {
   const stamp = Date.now();
   const { aliceCtx, bobCtx, alice, bob } = await pairUp(browser, stamp);

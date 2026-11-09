@@ -15,7 +15,12 @@ test("lobby is game-first", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Choose your next game" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Rock Paper Scissors" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Play Now" })).toBeVisible();
-  await expect(page.getByText("No public matches are live right now.")).toBeVisible();
+
+  // Game selection leads; live matches are a secondary section below it.
+  // Whether any are running depends on the rest of the suite, so this only
+  // checks the section is present and links on to the full directory.
+  await expect(page.getByRole("heading", { name: "Live matches" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Watch directory" })).toBeVisible();
 });
 
 test("join now asks guests to log in", async ({ page }) => {

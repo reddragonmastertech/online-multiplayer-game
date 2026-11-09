@@ -9,6 +9,7 @@ import {
 } from "@game-platform/game-rps";
 import {
   MATCH_RULES,
+  type LiveMatchSummary,
   type MatchOver,
   type MatchOverReason,
   type MatchReveal,
@@ -55,6 +56,8 @@ export type LiveMatch = {
 export type RuntimeEmitter = {
   /** Per-viewer, because each player may only see their own unrevealed hand. */
   state: (userId: string, payload: MatchState) => void;
+  /** One shared payload: every spectator sees the same restricted view. */
+  spectatorState: (matchId: string, payload: MatchState) => void;
   reveal: (matchId: string, payload: MatchReveal) => void;
   over: (matchId: string, payload: MatchOver) => void;
 };
@@ -162,6 +165,7 @@ export function createMatchRuntime(deps: {
       const player = match.players[seat];
       emit.state(player.userId, stateFor(match, player.userId, at));
     }
+    emit.spectatorState(match.matchId, stateFor(match, null, at));
   }
 
   function forget(match: LiveMatch) {
@@ -456,6 +460,38 @@ export function createMatchRuntime(deps: {
     matchFor(userId: string) {
       const matchId = byUser.get(userId);
       return matchId ? (live.get(matchId) ?? null) : null;
+    },
+
+    /**
+     * Public directory of matches in progress. Carries names, scores and the
+     * stake, never a hand, so it is safe to serve to anyone.
+     */
+    list(): LiveMatchSummary[] {
+      return [...live.values()]
+        .filter((match) => match.phase !== "over")
+        .map((match) => ({
+          matchId: match.matchId,
+          gameId: match.gameId,
+          mode: match.mode,
+          currency: match.currency,
+          stake: match.stake,
+          pot: match.stake * 2,
+          round: match.state.round,
+          firstTo: match.state.firstTo,
+          startedAt: match.startedAt,
+          players: [
+            {
+              name: match.players.a.name,
+              seat: "a" as const,
+              score: match.state.seats.a.score,
+            },
+            {
+              name: match.players.b.name,
+              seat: "b" as const,
+              score: match.state.seats.b.score,
+            },
+          ] as LiveMatchSummary["players"],
+        }));
     },
 
     get(matchId: string) {

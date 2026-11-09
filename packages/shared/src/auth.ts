@@ -51,4 +51,5 @@ export const apiPaths = {
   login: "/api/auth/login",
   me: "/api/me",
   matches: "/api/matches",
+  live: "/api/live",
 } as const;

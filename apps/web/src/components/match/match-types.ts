@@ -5,7 +5,12 @@ export type MatchMoveView = "choosing" | "locked" | RpsHand;
 export type MatchSeatView = {
   id: string;
   name: string;
-  avatar: number;
+  /**
+   * Stock-portrait id for the local CPU demo only. Real players pass `null`:
+   * nobody has uploaded an avatar yet, and putting a stranger's photo beside
+   * someone's arena name would misrepresent them.
+   */
+  avatar: number | null;
   score: number;
   move: MatchMoveView;
   you?: boolean;

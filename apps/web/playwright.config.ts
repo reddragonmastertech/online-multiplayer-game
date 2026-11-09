@@ -8,7 +8,11 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  // Matchmaking is one global queue keyed by game/mode/stake, so two tests
+  // searching at the same stake will pair with each other's players. One
+  // worker keeps each test facing the opponent it created.
+  fullyParallel: false,
+  workers: 1,
   use: {
     baseURL: "http://localhost:5174",
     trace: "on-first-retry",

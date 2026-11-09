@@ -84,9 +84,12 @@ function bindSocket(socket: ArenaSocket): ArenaSocket {
   return socket;
 }
 
+/**
+ * Spectating does not require an account, so this connects with whatever token
+ * is available, including none. The server decides what the socket may see.
+ */
 function socketOrNull() {
-  const token = useSessionStore.getState().token;
-  return token ? bindSocket(getSocket(token)) : null;
+  return bindSocket(getSocket(useSessionStore.getState().token ?? ""));
 }
 
 export const useMatchStore = create<MatchStoreState>((set, get) => ({
@@ -98,15 +101,16 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
   error: null,
 
   watch: (matchId) => {
-    if (get().matchId === matchId) {
-      socketOrNull();
-      return;
+    const socket = socketOrNull();
+    if (get().matchId !== matchId) {
+      set({ matchId, state: null, over: null, log: [], pending: null, error: null });
     }
 
-    set({ matchId, state: null, over: null, log: [], pending: null, error: null });
-    // Connecting is enough: the server re-seats a player in their live match
-    // and sends the authoritative state on connection.
-    socketOrNull();
+    // Players are re-seated automatically on connection; this also subscribes
+    // a spectator to the restricted view of a match they are not in.
+    const send = () => socket.emit(clientEvent.matchWatch, { matchId });
+    if (socket.connected) send();
+    else socket.once("connect", send);
   },
 
   move: (hand) => {
@@ -127,6 +131,10 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
   },
 
   clear: () => {
+    const { matchId } = get();
+    if (matchId) {
+      bound?.emit(clientEvent.matchUnwatch, { matchId });
+    }
     set({ matchId: null, state: null, over: null, log: [], pending: null, error: null });
   },
 }));
