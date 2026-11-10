@@ -1,0 +1,45 @@
+; systemd unit for the PvP Arena API, which also serves the built site.
+; Install:
+;   sudo cp deploy/arena.service /etc/systemd/system/arena.service
+;   sudo systemctl daemon-reload
+;   sudo systemctl enable --now arena
+; Logs:
+;   journalctl -u arena -f
+
+[Unit]
+Description=PvP Arena
+Documentation=https://github.com/your-org/pvp-online-game-platform
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=arena
+Group=arena
+WorkingDirectory=/srv/arena
+Environment=NODE_ENV=production
+; Reads /srv/arena/.env itself, so the file does not need to be listed here.
+ExecStart=/usr/bin/env pnpm --filter @game-platform/api start:prod
+
+Restart=always
+RestartSec=5
+
+; The app refunds in-flight matches and closes SQLite on SIGTERM. Give it room
+; to finish; killing it early is safe but leaves stakes locked until it starts
+; again and sweeps them.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+; The SQLite file lives under /srv/arena/apps/api/data, so that path must stay
+; writable. Everything else can be read-only.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/srv/arena/apps/api/data
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

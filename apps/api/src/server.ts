@@ -18,7 +18,12 @@ import { registerMatchGateway } from "./match/gateway";
 import { releaseUnsettledMatches } from "./match/store";
 
 export async function buildServer(config: AppConfig) {
-  const app = Fastify({ logger: true });
+  const app = Fastify({
+    logger: { level: config.logLevel },
+    // Behind a tunnel or reverse proxy the socket address is the proxy, so
+    // rate limiting and logs need the forwarded client address instead.
+    trustProxy: config.trustProxy,
+  });
   const registry = createGameRegistry();
   const db = createDatabase(config.databaseUrl);
 
@@ -27,7 +32,12 @@ export async function buildServer(config: AppConfig) {
   await app.register(cors, { origin: config.webOrigin });
 
   app.get("/health", async () => ({ status: "ok" }));
-  registerAuthRoutes(app, { db, jwtSecret: config.jwtSecret });
+  await registerAuthRoutes(app, {
+    db,
+    jwtSecret: config.jwtSecret,
+    signupRateLimit: config.signupRateLimit,
+    loginRateLimit: config.loginRateLimit,
+  });
 
   const io = new Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>(
     app.server,
@@ -56,6 +66,14 @@ export async function buildServer(config: AppConfig) {
   app.addHook("onClose", async () => {
     runtime.stop();
     await io.close();
+
+    // Matches in flight cannot survive this process, so give the stakes back
+    // now rather than leaving RAC locked until something starts again.
+    const stranded = releaseUnsettledMatches(db);
+    if (stranded.matches > 0) {
+      app.log.info(stranded, "released matches that were still running at shutdown");
+    }
+
     db.close();
   });
 

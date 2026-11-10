@@ -9,10 +9,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "start:e2e": "tsx --env-file=.env.e2e src/index.ts",
-    "start:served": "tsx --env-file=.env.served src/index.ts"
+    "start:served": "tsx --env-file=.env.served src/index.ts",
+    "start:prod": "tsx --env-file-if-exists=../../.env --env-file-if-exists=.env src/index.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",
+    "@fastify/rate-limit": "^11.2.2",
     "@fastify/static": "^10.1.10",
     "@game-platform/game-checkers": "workspace:*",
     "@game-platform/game-chess": "workspace:*",

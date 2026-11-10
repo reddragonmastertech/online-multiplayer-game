@@ -19,6 +19,20 @@ const envSchema = z.object({
   JWT_SECRET: optionalText,
   /** Overrides where the built web bundle is read from. */
   WEB_DIST: optionalText,
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
+  /** Set when a tunnel or reverse proxy terminates TLS in front of this. */
+  TRUST_PROXY: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  /**
+   * Signups allowed per client IP per hour. Each one mints the RAC bonus, so
+   * this is the faucet guard. Raise it when testers share one address: a house
+   * or an office behind a single NAT counts as one client here.
+   */
+  SIGNUP_RATE_LIMIT: z.coerce.number().int().positive().default(10),
+  /** Login attempts allowed per client IP per minute. */
+  LOGIN_RATE_LIMIT: z.coerce.number().int().positive().default(20),
   REDIS_URL: optionalText,
   SUPABASE_URL: optionalUrl,
   SUPABASE_ANON_KEY: optionalText,
@@ -33,6 +47,10 @@ export type AppConfig = {
   databaseUrl?: string;
   jwtSecret: string;
   webDist?: string;
+  logLevel: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
+  trustProxy: boolean;
+  signupRateLimit: number;
+  loginRateLimit: number;
   redisUrl?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
@@ -57,6 +75,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     databaseUrl: parsed.DATABASE_URL,
     jwtSecret,
     webDist: parsed.WEB_DIST,
+    logLevel: parsed.LOG_LEVEL,
+    trustProxy: parsed.TRUST_PROXY,
+    signupRateLimit: parsed.SIGNUP_RATE_LIMIT,
+    loginRateLimit: parsed.LOGIN_RATE_LIMIT,
     redisUrl: parsed.REDIS_URL,
     supabaseUrl: parsed.SUPABASE_URL,
     supabaseAnonKey: parsed.SUPABASE_ANON_KEY,
