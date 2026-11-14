@@ -32,7 +32,7 @@ export function HomeHeader() {
       <Link to="/" className="flex items-center gap-3">
         <LogoMark />
         <div>
-          <h1 className="bg-gradient-to-r from-[#ffe7a3] via-[#f6d36b] to-[#e09a2b] bg-clip-text font-[Rajdhani,Inter,sans-serif] text-[1.7rem] font-bold leading-none tracking-wide text-transparent">
+          <h1 className="bg-gradient-to-r from-[#ffe7a3] via-[#f6d36b] to-[#e09a2b] bg-clip-text font-display text-[1.7rem] font-bold leading-none tracking-wide text-transparent">
             RPS Arena
           </h1>
           <p className="mt-1 text-[11px] text-[#e7c56a]/85">

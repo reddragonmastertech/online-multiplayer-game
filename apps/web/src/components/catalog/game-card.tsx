@@ -11,7 +11,7 @@ export function GameCard({ game }: { game: CatalogGame }) {
       <GameArt gameId={game.id} className="h-40 sm:h-48" />
       <div className="flex flex-1 flex-col p-5">
         <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground">1v1</p>
-        <h3 className="mt-2 font-[Rajdhani,Inter,sans-serif] text-2xl font-bold">{game.name}</h3>
+        <h3 className="mt-2 font-display text-2xl font-bold">{game.name}</h3>
         <p className="mt-2 flex-1 text-sm text-muted-foreground">{game.blurb}</p>
         <p className="mt-3 text-xs text-muted-foreground">{game.matchType}</p>
         {available && game.href ? (

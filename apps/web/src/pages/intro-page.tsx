@@ -40,7 +40,7 @@ export function IntroPage() {
       <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
         <section className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_420px]">
           <div>
-            <h1 className="font-[Rajdhani,Inter,sans-serif] text-5xl font-bold leading-tight sm:text-6xl">
+            <h1 className="font-display text-5xl font-bold leading-tight sm:text-6xl">
               Your arena.
               <span className="block text-primary">Your next challenge.</span>
             </h1>
@@ -62,7 +62,7 @@ export function IntroPage() {
         <section className="mt-16">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <h2 className="font-[Rajdhani,Inter,sans-serif] text-3xl font-bold">Find your game</h2>
+              <h2 className="font-display text-3xl font-bold">Find your game</h2>
               <p className="mt-2 text-sm text-muted-foreground">
                 Jump into a match when a game is marked available.
               </p>
@@ -88,7 +88,7 @@ export function IntroPage() {
         </section>
 
         <section className="mt-16">
-          <h2 className="font-[Rajdhani,Inter,sans-serif] text-3xl font-bold">How it works</h2>
+          <h2 className="font-display text-3xl font-bold">How it works</h2>
           <ol className="mt-6 grid gap-4 md:grid-cols-3">
             {steps.map((step) => (
               <li key={step.n} className="rounded-2xl border border-border bg-card p-5">
@@ -101,7 +101,7 @@ export function IntroPage() {
         </section>
 
         <section className="mt-16 rounded-3xl border border-border bg-card p-6 sm:p-8">
-          <h2 className="font-[Rajdhani,Inter,sans-serif] text-3xl font-bold">Fair play</h2>
+          <h2 className="font-display text-3xl font-bold">Fair play</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
             Hands are hidden until both players lock in. The API, not the browser, judges rounds, timers, and
             results. Rankings and paid modes stay off this build so we do not show numbers we cannot back.
@@ -109,7 +109,7 @@ export function IntroPage() {
         </section>
 
         <section className="mt-16">
-          <h2 className="font-[Rajdhani,Inter,sans-serif] text-3xl font-bold">FAQ</h2>
+          <h2 className="font-display text-3xl font-bold">FAQ</h2>
           <dl className="mt-6 space-y-4">
             {faqs.map((item) => (
               <div key={item.q} className="rounded-2xl border border-border bg-card p-5">

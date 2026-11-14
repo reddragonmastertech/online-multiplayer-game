@@ -24,13 +24,13 @@ function MoveMark({ move }: { move: MatchMoveView }) {
         className={cn(
           "mx-auto grid size-20 place-items-center rounded-3xl border text-4xl sm:size-24 sm:text-5xl",
           hidden
-            ? "border-dashed border-[#30425B] bg-black/30 text-3xl text-[#B1C0D2]"
-            : "border-[#42DDCD]/70 bg-[#10242C] shadow-[0_0_28px_rgb(66_221_205/0.18)]",
+            ? "border-dashed border-border bg-black/30 text-3xl text-muted-foreground"
+            : "border-primary/70 bg-[#10242C] shadow-[0_0_28px_color-mix(in_srgb,var(--primary)_18%,transparent)]",
         )}
       >
         <span aria-hidden="true">{hidden ? "?" : rpsGlyphs[move]}</span>
       </div>
-      <p className="mt-2 text-sm font-semibold text-[#F5F8FD]">{label}</p>
+      <p className="mt-2 text-sm font-semibold text-foreground">{label}</p>
     </div>
   );
 }
@@ -54,7 +54,7 @@ export function RpsBoard({
     <div>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
         <MoveMark move={leftMove} />
-        <span className="text-xs font-semibold tracking-[0.2em] text-[#B1C0D2]/70">VS</span>
+        <span className="text-xs font-semibold tracking-[0.2em] text-muted-foreground/70">VS</span>
         <MoveMark move={rightMove} />
       </div>
 
@@ -71,17 +71,17 @@ export function RpsBoard({
                 aria-label={hand}
                 aria-pressed={active}
                 className={cn(
-                  "rounded-2xl border px-2 py-3 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#42DDCD] disabled:cursor-default disabled:opacity-60",
+                  "rounded-2xl border px-2 py-3 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-60",
                   active
-                    ? "border-[#42DDCD] bg-[#10242C]"
-                    : "border-[#30425B] bg-black/25 hover:border-[#42DDCD]/60",
+                    ? "border-primary bg-[#10242C]"
+                    : "border-border bg-black/25 hover:border-primary/60",
                 )}
               >
                 <span className="text-2xl" aria-hidden="true">
                   {rpsGlyphs[hand]}
                 </span>
                 <p className="mt-1 text-xs font-semibold">{hand}</p>
-                <p className="text-[10px] text-[#B1C0D2]">beats {beats[hand]}</p>
+                <p className="text-[10px] text-muted-foreground">beats {beats[hand]}</p>
               </button>
             );
           })}

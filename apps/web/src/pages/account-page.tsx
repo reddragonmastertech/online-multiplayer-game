@@ -93,7 +93,7 @@ export function AccountPage() {
     return (
       <div className="grid h-full place-items-center p-6">
         <section className="max-w-md rounded-3xl border border-border bg-card p-8 text-center">
-          <h1 className="font-[Rajdhani,Inter,sans-serif] text-3xl font-bold">Account</h1>
+          <h1 className="font-display text-3xl font-bold">Account</h1>
           <p className="mt-3 text-sm text-muted-foreground">
             Log in to see your name and RAC balance.
           </p>
@@ -120,12 +120,12 @@ export function AccountPage() {
           <span aria-hidden="true"> / </span>
           Account
         </p>
-        <h1 className="mt-4 font-[Rajdhani,Inter,sans-serif] text-4xl font-bold">{user.name}</h1>
+        <h1 className="mt-4 font-display text-4xl font-bold">{user.name}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{user.email}</p>
 
         <section className="mt-6 rounded-3xl border border-primary/40 bg-card p-6">
           <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground">RAC BALANCE</p>
-          <p className="mt-2 font-[Rajdhani,Inter,sans-serif] text-5xl font-bold text-primary">
+          <p className="mt-2 font-display text-5xl font-bold text-primary">
             {racAvailable(wallets)}
           </p>
           <p className="mt-2 text-sm text-muted-foreground">

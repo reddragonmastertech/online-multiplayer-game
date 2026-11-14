@@ -17,7 +17,7 @@ export function LobbyPage() {
           <span className="size-2 rounded-full bg-primary" />
           Connected
         </p>
-        <h1 className="mt-3 font-[Rajdhani,Inter,sans-serif] text-4xl font-bold sm:text-5xl">
+        <h1 className="mt-3 font-display text-4xl font-bold sm:text-5xl">
           Choose your next game
         </h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">

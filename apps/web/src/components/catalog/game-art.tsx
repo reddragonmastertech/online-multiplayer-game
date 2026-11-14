@@ -16,7 +16,7 @@ export function GameArt({
         className,
       )}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgb(66_221_205/0.18),transparent_55%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,color-mix(in_srgb,var(--primary)_18%,transparent),transparent_55%)]" />
       {gameId === "rps" ? (
         <div className="relative flex h-full items-center justify-center gap-3 text-4xl sm:text-5xl">
           <span>✊</span>

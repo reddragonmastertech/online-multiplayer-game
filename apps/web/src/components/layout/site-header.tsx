@@ -15,10 +15,10 @@ const nav = [
 export function BrandLink() {
   return (
     <Link to="/" className="flex items-center gap-2.5">
-      <span className="grid size-8 place-items-center rounded-lg bg-primary font-[Rajdhani,Inter,sans-serif] text-lg font-bold text-primary-foreground">
+      <span className="grid size-8 place-items-center rounded-lg bg-primary font-display text-lg font-bold text-primary-foreground">
         A
       </span>
-      <span className="font-[Rajdhani,Inter,sans-serif] text-xl font-bold tracking-[0.18em] text-foreground">
+      <span className="font-display text-xl font-bold tracking-[0.18em] text-foreground">
         ARENA
       </span>
     </Link>
@@ -40,7 +40,7 @@ function AuthActions({ onNavigate }: { onNavigate?: () => void }) {
           className="flex min-w-0 items-center gap-3 rounded-full border border-border px-3 py-1.5 hover:bg-elevated"
         >
           <span className="truncate text-sm font-semibold">{user.name}</span>
-          <span className="font-[Rajdhani,Inter,sans-serif] text-sm font-bold text-primary">
+          <span className="font-display text-sm font-bold text-primary">
             {racAvailable(wallets)} RAC
           </span>
         </Link>

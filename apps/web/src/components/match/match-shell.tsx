@@ -23,16 +23,16 @@ export function MatchShell({
           <div className="flex min-w-0 items-center gap-3">
             <Link
               to={view.backTo}
-              className="inline-flex items-center gap-2 rounded-full border border-[#30425B] bg-[#121D2D] px-4 py-2 text-sm text-[#F5F8FD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#42DDCD]"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ArrowLeft className="size-4" aria-hidden="true" />
               {view.backLabel ?? "Lobby"}
             </Link>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold tracking-[0.16em] text-[#B1C0D2]">
+              <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground">
                 {view.gameName} · {view.modeLabel}
               </p>
-              <h2 className="truncate font-[Rajdhani,Inter,sans-serif] text-2xl font-bold tracking-wide sm:text-3xl">
+              <h2 className="truncate font-display text-2xl font-bold tracking-wide sm:text-3xl">
                 {view.title}
               </h2>
             </div>
@@ -40,13 +40,13 @@ export function MatchShell({
           {view.role === "spectator" ? (
             <span
               role="status"
-              className="inline-flex items-center gap-1 rounded-full border border-[#FF7080]/40 bg-[#FF7080]/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#FF7080]"
+              className="inline-flex items-center gap-1 rounded-full border border-danger/40 bg-danger/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-danger"
             >
               <Eye className="size-3" aria-hidden="true" />
               SPECTATING
             </span>
           ) : view.badge ? (
-            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#EBC26A]">
+            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-gold">
               {view.badge}
             </span>
           ) : null}
@@ -57,25 +57,25 @@ export function MatchShell({
             <PlayerSeat seat={view.left} />
           </div>
 
-          <section className="order-1 overflow-hidden rounded-3xl border border-[#30425B] bg-[radial-gradient(circle_at_center,#1B2940_0%,#090F1D_72%)] p-4 sm:p-6 lg:order-2">
+          <section className="order-1 overflow-hidden rounded-3xl border border-border bg-[radial-gradient(circle_at_center,var(--elevated)_0%,var(--background)_72%)] p-4 sm:p-6 lg:order-2">
             <div className="flex items-center justify-between gap-3 text-[11px]">
-              <p className="font-semibold text-[#42DDCD]">{view.potLabel ?? "Free match"}</p>
-              <p className="text-[#B1C0D2]">
+              <p className="font-semibold text-primary">{view.potLabel ?? "Free match"}</p>
+              <p className="text-muted-foreground">
                 Round {view.round} · {view.modeLabel}
               </p>
             </div>
 
             <p className="my-6 text-center">
               {showTimer ? (
-                <span className="text-sm text-[#42DDCD]">
+                <span className="text-sm text-primary">
                   {view.status}{" "}
-                  <span className="mx-1 font-[Rajdhani,Inter,sans-serif] text-6xl font-bold text-white">
+                  <span className="mx-1 font-display text-6xl font-bold text-white">
                     {view.secondsLeft}
                   </span>
                   s
                 </span>
               ) : (
-                <span className="font-[Rajdhani,Inter,sans-serif] text-3xl font-bold text-white">{view.status}</span>
+                <span className="font-display text-3xl font-bold text-white">{view.status}</span>
               )}
             </p>
 
@@ -85,7 +85,7 @@ export function MatchShell({
               <button
                 type="button"
                 onClick={onPlayAgain}
-                className="mt-4 w-full rounded-full bg-[#42DDCD] py-2.5 text-sm font-bold tracking-wide text-[#090F1D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#42DDCD]"
+                className="mt-4 w-full rounded-full bg-primary py-2.5 text-sm font-bold tracking-wide text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 Play again
               </button>

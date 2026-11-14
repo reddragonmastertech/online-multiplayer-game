@@ -27,7 +27,7 @@ export function LegalPage() {
   return (
     <div className="min-h-full overflow-y-auto">
       <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        <h1 className="font-[Rajdhani,Inter,sans-serif] text-4xl font-bold">{page?.title}</h1>
+        <h1 className="font-display text-4xl font-bold">{page?.title}</h1>
         <p className="mt-4 text-sm leading-6 text-muted-foreground">{page?.body}</p>
       </main>
       <SiteFooter />

@@ -77,7 +77,7 @@ export function GameLobbyPage() {
     return (
       <div className="grid h-full place-items-center p-6">
         <section className="max-w-lg rounded-3xl border border-border bg-card p-8 text-center">
-          <h1 className="font-[Rajdhani,Inter,sans-serif] text-3xl font-bold">{game.name}</h1>
+          <h1 className="font-display text-3xl font-bold">{game.name}</h1>
           <p className="mt-3 text-sm text-muted-foreground">Coming soon. This game is not playable yet.</p>
           <Button className="mt-6" asChild>
             <Link to="/lobby">Back to games</Link>
@@ -129,7 +129,7 @@ export function GameLobbyPage() {
 
         <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div>
-            <h1 className="font-[Rajdhani,Inter,sans-serif] text-4xl font-bold">{game.name}</h1>
+            <h1 className="font-display text-4xl font-bold">{game.name}</h1>
             <p className="mt-2 text-muted-foreground">{game.blurb}</p>
             <p className="mt-2 text-sm text-muted-foreground">
               <Link to="/how-it-works" className="text-primary">
@@ -186,7 +186,7 @@ export function GameLobbyPage() {
                     searching && "opacity-60",
                   )}
                 >
-                  <p className="font-[Rajdhani,Inter,sans-serif] text-2xl font-bold">
+                  <p className="font-display text-2xl font-bold">
                     {amount} RAC
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">

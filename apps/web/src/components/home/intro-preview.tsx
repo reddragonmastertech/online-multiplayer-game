@@ -16,7 +16,7 @@ export function IntroPreview() {
   return (
     <section className="rounded-3xl border border-border bg-card p-5 sm:p-6">
       <p className="text-xs font-semibold tracking-[0.16em] text-muted-foreground">RULES PREVIEW</p>
-      <h2 className="mt-2 font-[Rajdhani,Inter,sans-serif] text-2xl font-bold">Tap a hand</h2>
+      <h2 className="mt-2 font-display text-2xl font-bold">Tap a hand</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         This is a local preview of the rules. It is not a match against another player.
       </p>

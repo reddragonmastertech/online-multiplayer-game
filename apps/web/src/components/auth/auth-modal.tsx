@@ -121,7 +121,7 @@ export function AuthModal() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-title"
-        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-3xl border border-primary/40 bg-card p-5 shadow-[0_0_48px_rgb(66_221_205/0.12)] sm:p-6"
+        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-3xl border border-primary/40 bg-card p-5 shadow-[0_0_48px_color-mix(in_srgb,var(--primary)_12%,transparent)] sm:p-6"
         onClick={(event) => event.stopPropagation()}
       >
         <button
@@ -133,12 +133,12 @@ export function AuthModal() {
           <X className="size-4" aria-hidden="true" />
         </button>
 
-        <p className="text-center font-[Rajdhani,Inter,sans-serif] text-sm font-bold tracking-[0.22em] text-primary">
+        <p className="text-center font-display text-sm font-bold tracking-[0.22em] text-primary">
           ARENA
         </p>
         <h2
           id="auth-title"
-          className="mt-2 text-center font-[Rajdhani,Inter,sans-serif] text-3xl font-bold tracking-wide"
+          className="mt-2 text-center font-display text-3xl font-bold tracking-wide"
         >
           {isLogin ? "Welcome back" : "Create your account"}
         </h2>

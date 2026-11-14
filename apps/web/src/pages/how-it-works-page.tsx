@@ -6,7 +6,7 @@ export function HowItWorksPage() {
   return (
     <div className="min-h-full overflow-y-auto">
       <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        <h1 className="font-[Rajdhani,Inter,sans-serif] text-4xl font-bold">How it works</h1>
+        <h1 className="font-display text-4xl font-bold">How it works</h1>
         <ol className="mt-8 space-y-6 text-muted-foreground">
           <li>
             <h2 className="font-semibold text-foreground">1. Choose a game</h2>

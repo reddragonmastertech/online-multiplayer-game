@@ -34,7 +34,7 @@ export function PlayerSeat({
   return (
     <section
       className={cn(
-        "rounded-2xl border border-[#30425B] bg-[#121D2D] p-4",
+        "rounded-2xl border border-border bg-card p-4",
         align === "left" && "text-left",
         align === "right" && "text-right",
         align === "center" && "text-center",
@@ -44,7 +44,7 @@ export function PlayerSeat({
         <InitialsAvatar
           name={seat.name}
           className={cn(
-            "size-20 rounded-2xl ring-2 ring-[#42DDCD]/70 sm:size-24",
+            "size-20 rounded-2xl ring-2 ring-ring/70 sm:size-24",
             align === "center" && "mx-auto",
             align === "right" && "ml-auto",
           )}
@@ -54,22 +54,22 @@ export function PlayerSeat({
           id={seat.avatar}
           name={seat.name}
           className={cn(
-            "size-20 rounded-2xl ring-2 ring-[#42DDCD]/70 sm:size-24",
+            "size-20 rounded-2xl ring-2 ring-ring/70 sm:size-24",
             align === "center" && "mx-auto",
             align === "right" && "ml-auto",
           )}
         />
       )}
-      <p className="mt-3 truncate text-sm text-[#F5F8FD]">
+      <p className="mt-3 truncate text-sm text-foreground">
         {seat.name}
-        {seat.you ? <span className="ml-2 text-[10px] font-semibold tracking-wider text-[#42DDCD]">YOU</span> : null}
-        {seat.bot ? <span className="ml-2 text-[10px] font-semibold tracking-wider text-[#B1C0D2]">CPU</span> : null}
+        {seat.you ? <span className="ml-2 text-[10px] font-semibold tracking-wider text-primary">YOU</span> : null}
+        {seat.bot ? <span className="ml-2 text-[10px] font-semibold tracking-wider text-muted-foreground">CPU</span> : null}
       </p>
-      <p className="mt-3 font-[Rajdhani,Inter,sans-serif] text-5xl font-bold leading-none text-[#EBC26A]">
+      <p className="mt-3 font-display text-5xl font-bold leading-none text-gold">
         {seat.score}
       </p>
-      <p className="mt-1 text-[11px] font-semibold tracking-[0.16em] text-[#B1C0D2]">SCORE</p>
-      <p className="mt-4 rounded-full bg-black/35 px-3 py-1 text-xs text-[#B1C0D2]">{moveLabel(seat.move)}</p>
+      <p className="mt-1 text-[11px] font-semibold tracking-[0.16em] text-muted-foreground">SCORE</p>
+      <p className="mt-4 rounded-full bg-black/35 px-3 py-1 text-xs text-muted-foreground">{moveLabel(seat.move)}</p>
     </section>
   );
 }
