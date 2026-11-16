@@ -12,6 +12,6 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "build": "pnpm -r --if-present build",
-    "start": "pnpm --filter @game-platform/web build && pnpm --filter @game-platform/api start"
+    "start": "pnpm --filter @game-platform/web build && pnpm --filter @game-platform/api start:prod"
   }
 }

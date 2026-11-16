@@ -3,6 +3,9 @@
 One Node process serves the API, the websockets and the built site. No Docker,
 no Redis, no Postgres: the database is a SQLite file.
 
+New to the codebase? [`../docs/Project_Structure.md`](../docs/Project_Structure.md)
+explains what you are deploying.
+
 **One process only.** Matchmaking and live matches live in that process's
 memory. A second instance keeps its own queue, so two players would never meet.
 Do not scale this horizontally without moving the queue out of memory first.
@@ -76,16 +79,27 @@ The build must be re-run on every deploy. The API serves whatever is in
 No open router ports, no server to rent. The tunnel gives you an HTTPS URL that
 forwards to the port the app is listening on.
 
-```bash
-# terminal 1
-pnpm start                       # builds the site, then runs the server
+Start the tunnel **first**, because you cannot set `WEB_ORIGIN` until you know
+the URL. Requests will fail until the app is up; that is expected.
 
-# terminal 2
+```bash
+# terminal 1 — prints https://<something>.trycloudflare.com
 cloudflared tunnel --url http://localhost:3001
 ```
 
-`cloudflared` prints a `https://<something>.trycloudflare.com` address. Put that
-in `WEB_ORIGIN` and restart the app, otherwise CORS will reject the browser.
+Put that address in `WEB_ORIGIN` in your `.env`, then:
+
+```bash
+# terminal 2 — builds the site, reads .env, runs the server
+pnpm start
+```
+
+`pnpm start` loads `.env`. If you skip the build step use
+`pnpm --filter @game-platform/api start:prod`, which does the same without
+rebuilding.
+
+Get `WEB_ORIGIN` wrong and the page will load but every request fails, because
+it is the only origin CORS allows.
 
 A quick tunnel's address changes every time you start it, which means editing
 `WEB_ORIGIN` each time. For anything you will share more than once, use a named
