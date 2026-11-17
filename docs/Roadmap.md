@@ -169,7 +169,129 @@ option.
 
 **Done when** the spec §13 match-room checks for chat pass.
 
-### 4.2 A second game
+### 4.2 Paid version: USDT rooms
+
+Two currencies that never mix. **RAC is the free version, USDT is the paid
+version.** There is no exchange rate and no transfer in either direction.
+
+| | RAC (free) | USDT (paid) |
+|---|---|---|
+| How you get it | 100 on signup | Deposit USDT on-chain |
+| Starting balance | 100 | 0 |
+| Stakes | 1 / 5 / 10 | 0.2 / 0.5 / 1 / 2 / 5 / 10 |
+| House cut | None, winner takes both stakes | **10% of the pot** |
+| CPU practice | Yes | No |
+| Cash value | None | Real, withdrawable |
+
+The match rules are the same in both: best of 3, 10-second rounds, 20-second
+disconnect grace. Example of the cut: two players stake 1 USDT, the pot is
+2 USDT, the house keeps 0.2 and the winner receives 1.8. A refunded match (for
+example, one that never started) returns both stakes in full, with no cut.
+
+USDT amounts are stored as **whole integers of 0.000001 USDT** (the token's own
+precision), never as decimals, so rounding can never create or lose money. Every
+stake and every 10% cut divides exactly.
+
+Built in four parts, in this order. Parts A to C each end with the typecheck,
+the unit tests and the e2e suite passing.
+
+#### Part A: two currencies in the game
+
+- [ ] **Rules** in `packages/shared/src/rules.ts`: `currency: "RAC" | "USDT"`, a
+      stake list per currency, and the house cut per currency (RAC 0%, USDT
+      10%).
+- [ ] **Migration 2** in `apps/api/src/db/migrate.ts`: one balance per user per
+      currency. The ledger and matches get a `currency` column. Existing
+      balances become RAC; every account gets a USDT balance of 0. A
+      `house` ledger entry records each cut.
+- [ ] **Wallet** (`apps/api/src/wallet/*`): stake lock, payout, cut and refund
+      per currency. A test checks that no operation ever moves value between
+      RAC and USDT.
+- [ ] **Matchmaking** (`apps/api/src/match/queue.ts`): the queue key is game +
+      currency + stake, so a RAC player never meets a USDT player.
+- [ ] **Lobby:** RAC and USDT tabs, with both balances in the header. A USDT
+      room you cannot afford shows **Top up** instead of JOIN NOW.
+- [ ] **Match room, result and history** show the currency, and for USDT the
+      cut, everywhere an amount appears.
+- [ ] **Tests:** both currencies through the queue, the payout and the e2e
+      suite; two players on the same stake in different currencies are never
+      paired.
+
+**Done when** two players can finish a USDT match (balances seeded by a test
+script) and the database shows the winner +stake×0.8, the loser −stake and the
+house +stake×0.2, with RAC untouched.
+
+#### Part B: deposits
+
+The flow in the payment screenshots: a **USDT** card under Wallet → payment
+method, and a **Top Up By USDT** dialog with **ERC20 / BEP20 / TRC20** tabs.
+
+- [ ] **Settings:** the three receiving addresses come from `.env`
+      (`USDT_ADDRESS_ERC20`, `USDT_ADDRESS_BEP20`, `USDT_ADDRESS_TRC20`), never
+      from code. Minimum 3 USDT, deposit fee 1%, required confirmations per
+      network. Free API keys for Etherscan and BscScan; TronGrid needs none.
+- [ ] **Save your sending wallet first.** A TxID is public, so anyone could
+      paste someone else's. The server only credits a transfer that came
+      **from** the wallet the user saved for that network.
+- [ ] **Claim by TxID:** the user pays, pastes the transaction ID, and the
+      server checks it on the chain: sent to our address, the real USDT
+      contract (not a look-alike token), from the user's saved wallet, enough
+      confirmations, at least the minimum, and never claimed before. It then
+      credits **amount − 1%** to the USDT balance.
+- [ ] **Migration 3:** `deposit_wallets` (user, network, address) and
+      `deposits` (TxID **unique**, network, amount, fee, credited, time). The
+      ledger credit and the deposit row are written in one transaction, so a
+      TxID can never be credited twice.
+- [ ] **Web:** the dialog from the screenshots (address, copy button, QR code,
+      the notes about minimum, confirmation time and fee), the save-wallet
+      step, the TxID box with its status, and a deposit history list.
+- [ ] **Tests** with faked chain answers, so no test touches a real network:
+      a good claim, the same TxID twice, the wrong receiving address, a fake
+      token, a transfer from another wallet, below the minimum, and not yet
+      confirmed. One e2e test of the dialog.
+- [ ] Mark ERC20 as expensive: Ethereum gas often costs more than a small
+      deposit. TRC20 and BEP20 are the recommended networks.
+
+**Done when** a real small TRC20 deposit on the live site shows up in the
+user's USDT balance, and claiming the same TxID again is refused.
+
+#### Part C: withdrawals, with manual admin approval
+
+The server never holds a private key and never sends money by itself.
+
+- [ ] **Request:** the user asks to withdraw an amount to their saved wallet
+      for a network. The amount moves from the balance to `locked` straight
+      away, so it cannot be staked while waiting.
+- [ ] **Admin list:** pending requests with the user, amount, network and
+      address. The admin sends the USDT from their own wallet, pastes the TxID
+      and marks the request **paid**, or **rejects** it, which unlocks the
+      amount back to the balance.
+- [ ] **Admin access:** an `is_admin` flag on the user, set from the command
+      line, never through the API. Every admin action is logged with who did
+      it.
+- [ ] **Migration 4:** `withdrawals` (user, amount, network, address, status
+      `pending` → `paid` / `rejected`, payout TxID, admin, times).
+- [ ] The user sees each request's status in their wallet history.
+- [ ] Decide the withdrawal minimum and fee before building.
+
+**Done when** a request goes pending → paid with the balance right at every
+step, and a rejected request returns the full amount.
+
+#### Part D: running real money
+
+- [ ] **Admin lookup:** find a user and see their deposits, withdrawals,
+      matches and ledger.
+- [ ] **Daily reconciliation:** the sum of USDT balances (including locked)
+      must equal deposits credited − withdrawals paid − house cuts. A mismatch
+      is logged as an error.
+- [ ] **House earnings:** a total of the cuts, so you can see what to sweep.
+- [ ] **Backups before every upgrade,** now a hard rule rather than advice.
+- [ ] **Legal, before Part B goes live.** Paid entry to PvP matches for USDT
+      prizes counts as gambling in most countries. It usually needs a licence,
+      age and identity checks, and blocking the countries where it is not
+      allowed. Record what was decided in the build log.
+
+### 4.3 A second game
 
 The real test of whether the match shell is game-agnostic.
 
@@ -185,7 +307,7 @@ The real test of whether the match shell is game-agnostic.
 engine, its board, its catalog entry and its registration, or with the
 exceptions written up.
 
-### 4.3 Account area
+### 4.4 Account area
 
 The spec asks for six tabs. Build only the tabs that have real data.
 
@@ -193,10 +315,12 @@ The spec asks for six tabs. Build only the tabs that have real data.
 - [ ] **Profile:** edit the display name, with the same uniqueness rule as
       signup.
 - [ ] **Settings:** change the password, and log out everywhere.
-- [ ] **Wallet:** the ledger as a transaction list. The data already exists.
+- [ ] **Wallet:** the ledger as a transaction list, per currency. The data
+      already exists. The USDT deposit and withdrawal screens from 4.2 live
+      here.
 - [ ] Missions and Inventory stay hidden until something backs them.
 
-### 4.4 Leaderboards
+### 4.5 Leaderboards
 
 - [ ] Wait until there are enough finished matches for a ranking to mean
       something.
@@ -238,6 +362,9 @@ Do this alongside the phases above, not as a separate project.
 
 ## Still out of scope
 
-Unchanged from the build log: no real money, no USDT, no second API instance,
-no Redis, no Supabase. Any real-value play needs the legal review described in
-spec §1 and §10 before any code.
+No second API instance, no Redis, no Supabase. No conversion between RAC and
+USDT, and no automatic payouts: every withdrawal is sent by hand.
+
+USDT is no longer out of scope: it is planned as the paid version in 4.2. The
+legal review described in spec §1 and §10 still has to happen before deposits
+go live.

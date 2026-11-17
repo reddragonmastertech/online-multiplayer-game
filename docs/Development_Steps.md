@@ -241,6 +241,23 @@ The two seated players can talk during a match; nobody else can.
   "a spectator who sends anyway is refused" is a gateway rule that unit tests
   of the chat module cannot reach.
 
+### Decision — a paid version in USDT (planned, not built)
+
+This reverses "USDT stays hidden". The plan is Roadmap step 4.2.
+
+- **Two currencies that never mix.** RAC stays free (100 on signup, stakes
+  1 / 5 / 10). USDT is the paid version: deposited on-chain, starting balance
+  0, stakes 0.2 / 0.5 / 1 / 2 / 5 / 10. No exchange rate, no transfer between
+  them.
+- **The house keeps 10% of the pot** in USDT matches. RAC matches have no cut.
+- **Deposits** go to fixed ERC20 / BEP20 / TRC20 addresses set in `.env`. The
+  user saves their sending wallet, pastes the TxID, and the server verifies it
+  on the chain before crediting the amount minus a 1% fee.
+- **Withdrawals are approved by hand.** An admin sends the USDT and marks the
+  request paid. The server never holds a private key.
+- **Legal review is still open** and has to be settled before deposits go
+  live.
+
 ---
 
 ## Deliberately not built
@@ -251,7 +268,7 @@ The two seated players can talk during a match; nobody else can.
 | Redis | One process; the queue is in memory |
 | Supabase | Our own JWT is enough |
 | Postgres | Would need Docker for no gain yet |
-| USDT, payments | Out of scope. RAC is play-only credit |
+| USDT, payments | Not built yet. Planned as the paid version (Roadmap 4.2) |
 | A second API instance | Would split the queue |
 | Email verification, password reset | Testers use email + password |
 | Chat reporting and moderation | Mute exists; there is nowhere to send a report |
@@ -286,10 +303,12 @@ order of value:
 
 1. **Publish it** and run the two-device test. Everything else is guesswork
    until real people have played.
-2. **A second game.** The structure is ready; it is the real test of whether
+2. **The paid version:** USDT rooms, deposits and hand-approved withdrawals.
+   Decided; see the decision entry above.
+3. **A second game.** The structure is ready; it is the real test of whether
    the match shell is as game-agnostic as intended. Deferred for now by
    decision.
-3. **The account area** beyond the overview: profile, settings, the ledger as
+4. **The account area** beyond the overview: profile, settings, the ledger as
    a wallet page.
-4. **Leaderboards**, once there are enough matches for a ranking to mean
+5. **Leaderboards**, once there are enough matches for a ranking to mean
    anything.
