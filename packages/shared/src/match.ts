@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { displayNameSchema } from "./auth";
 import { isoDateSchema, matchIdSchema, userIdSchema } from "./common";
-import { playableCurrencySchema, racAmountSchema } from "./economy";
+import { amountSchema, currencySchema } from "./economy";
 
 export const catalogGameIdSchema = z.enum(["rps", "chess", "four-by-four"]);
 export type CatalogGameId = z.infer<typeof catalogGameIdSchema>;
@@ -62,8 +62,8 @@ export const lobbyStakeSchema = z.object({
   id: z.string().min(1),
   gameId: playableGameIdSchema,
   mode: playableRpsModeSchema,
-  currency: playableCurrencySchema,
-  stake: racAmountSchema,
+  currency: currencySchema,
+  stake: amountSchema,
   enabled: z.boolean(),
 });
 export type LobbyStake = z.infer<typeof lobbyStakeSchema>;
@@ -71,8 +71,8 @@ export type LobbyStake = z.infer<typeof lobbyStakeSchema>;
 export const queueEntrySchema = z.object({
   gameId: playableGameIdSchema,
   mode: playableRpsModeSchema,
-  currency: playableCurrencySchema,
-  stake: racAmountSchema,
+  currency: currencySchema,
+  stake: amountSchema,
 });
 export type QueueEntry = z.infer<typeof queueEntrySchema>;
 
@@ -84,9 +84,9 @@ export const matchSummarySchema = z.object({
   matchId: matchIdSchema,
   gameId: playableGameIdSchema,
   mode: playableRpsModeSchema,
-  currency: playableCurrencySchema,
-  stake: racAmountSchema,
-  pot: racAmountSchema,
+  currency: currencySchema,
+  stake: amountSchema,
+  pot: amountSchema,
   status: matchStatusSchema,
   round: z.number().int().positive(),
   firstTo: z.number().int().positive(),
@@ -154,9 +154,9 @@ export const liveMatchSummarySchema = z.object({
   matchId: matchIdSchema,
   gameId: playableGameIdSchema,
   mode: playableRpsModeSchema,
-  currency: playableCurrencySchema,
-  stake: racAmountSchema,
-  pot: racAmountSchema,
+  currency: currencySchema,
+  stake: amountSchema,
+  pot: amountSchema,
   round: z.number().int().positive(),
   firstTo: z.number().int().positive(),
   startedAt: isoDateSchema,
@@ -179,14 +179,14 @@ export const matchHistoryEntrySchema = z.object({
   matchId: matchIdSchema,
   gameId: playableGameIdSchema,
   mode: playableRpsModeSchema,
-  currency: playableCurrencySchema,
-  stake: racAmountSchema,
+  currency: currencySchema,
+  stake: amountSchema,
   result: matchResultSchema,
   reason: matchOverReasonSchema,
   opponentName: displayNameSchema,
   yourScore: z.number().int().nonnegative(),
   opponentScore: z.number().int().nonnegative(),
-  /** Net RAC change for this match: +stake on a win, -stake on a loss. */
+  /** Net change in the match currency: the winner gets the pot minus the house cut, the loser loses the stake. */
   delta: z.number().int(),
   finishedAt: isoDateSchema,
 });

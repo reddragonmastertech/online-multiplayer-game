@@ -1,43 +1,45 @@
 import { DatabaseSync } from "node:sqlite";
-import type { MatchOver, MatchReveal, MatchState, RpsHand } from "@game-platform/shared";
-import { MATCH_RULES } from "@game-platform/shared";
+import type { Currency, MatchOver, MatchReveal, MatchState, RpsHand } from "@game-platform/shared";
+import { MATCH_RULES, USDT_UNIT } from "@game-platform/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AppDatabase } from "../db/client";
 import { migrateSqlite } from "../db/migrate";
-import { lockRacStake, readRacWallet } from "../economy/wallet";
+import { houseTotal, lockStake, readWallet } from "../economy/wallet";
 import { loadMatchHistory } from "./history";
 import { createMatchRuntime } from "./runtime";
 import { createQueuedMatch } from "./store";
 
 const STAKE = 5;
 
-function seedUser(db: AppDatabase, id: string, available = 100) {
+function seedUser(db: AppDatabase, id: string, available = 100, currency: Currency = "rac") {
   db.prepare(
     "INSERT INTO users (id, name, email, password_hash, created_at) VALUES (?, ?, ?, 'x', '2026-01-01T00:00:00.000Z')",
   ).run(id, `Player ${id}`, `${id}@example.test`);
+  db.prepare("INSERT INTO wallets (user_id, currency, available, locked) VALUES (?, ?, ?, 0)").run(
+    id,
+    currency,
+    available,
+  );
   db.prepare(
-    "INSERT INTO wallets (user_id, currency, available, locked) VALUES (?, 'rac', ?, 0)",
-  ).run(id, available);
-  db.prepare(
-    "INSERT INTO ledger_entries (id, user_id, currency, kind, amount, match_id, created_at) VALUES (?, ?, 'rac', 'signup_bonus', ?, NULL, '2026-01-01T00:00:00.000Z')",
-  ).run(`ledger-${id}`, id, available);
+    "INSERT INTO ledger_entries (id, user_id, currency, kind, amount, match_id, created_at) VALUES (?, ?, ?, 'signup_bonus', ?, NULL, '2026-01-01T00:00:00.000Z')",
+  ).run(`ledger-${id}`, id, currency, available);
 }
 
-function harness() {
+function harness(currency: Currency = "rac", stake = STAKE, opening = 100) {
   const db = new DatabaseSync(":memory:");
   db.exec("PRAGMA foreign_keys = ON");
   migrateSqlite(db);
-  seedUser(db, "alice");
-  seedUser(db, "bob");
+  seedUser(db, "alice", opening, currency);
+  seedUser(db, "bob", opening, currency);
 
-  lockRacStake(db, { userId: "alice", stake: STAKE });
-  lockRacStake(db, { userId: "bob", stake: STAKE });
+  lockStake(db, { userId: "alice", currency, stake });
+  lockStake(db, { userId: "bob", currency, stake });
 
   const { matchId } = createQueuedMatch(db, {
     gameId: "rps",
     mode: "first-to-2",
-    currency: "rac",
-    stake: STAKE,
+    currency,
+    stake,
     players: [
       { seat: "a", userId: "alice", name: "Player alice" },
       { seat: "b", userId: "bob", name: "Player bob" },
@@ -66,8 +68,8 @@ function harness() {
     matchId,
     gameId: "rps",
     mode: "first-to-2",
-    currency: "rac",
-    stake: STAKE,
+    currency,
+    stake,
     players: {
       a: { userId: "alice", name: "Player alice" },
       b: { userId: "bob", name: "Player bob" },
@@ -189,8 +191,8 @@ describe("match runtime", () => {
       { userId: "bob", delta: -STAKE },
     ]);
 
-    expect(readRacWallet(h.db, "alice")).toEqual({ available: 100 + STAKE, locked: 0 });
-    expect(readRacWallet(h.db, "bob")).toEqual({ available: 100 - STAKE, locked: 0 });
+    expect(readWallet(h.db, "alice", "rac")).toEqual({ available: 100 + STAKE, locked: 0 });
+    expect(readWallet(h.db, "bob", "rac")).toEqual({ available: 100 - STAKE, locked: 0 });
   });
 
   it("keeps the ledger equal to the available balance after settling", () => {
@@ -201,7 +203,7 @@ describe("match runtime", () => {
       const total = h.db
         .prepare("SELECT COALESCE(SUM(amount), 0) AS t FROM ledger_entries WHERE user_id = ?")
         .get(userId) as { t: number };
-      expect(total.t).toBe(readRacWallet(h.db, userId)?.available);
+      expect(total.t).toBe(readWallet(h.db, userId, "rac")?.available);
     }
   });
 
@@ -226,8 +228,8 @@ describe("match runtime", () => {
     expect(h.runtime.forfeit("bob", h.matchId)).toBeNull();
 
     expect(h.overs[0]).toMatchObject({ winnerSeat: "a", reason: "forfeit" });
-    expect(readRacWallet(h.db, "alice")?.available).toBe(100 + STAKE);
-    expect(readRacWallet(h.db, "bob")?.available).toBe(100 - STAKE);
+    expect(readWallet(h.db, "alice", "rac")?.available).toBe(100 + STAKE);
+    expect(readWallet(h.db, "bob", "rac")?.available).toBe(100 - STAKE);
   });
 
   it("waits the full grace period before a disconnect forfeits", () => {
@@ -330,5 +332,84 @@ describe("match runtime", () => {
     expect(h.latestFor("alice")?.secondsLeft).toBe(MATCH_RULES.roundSeconds);
     h.advance(3000);
     expect(h.latestFor("alice")?.secondsLeft).toBe(MATCH_RULES.roundSeconds - 3);
+  });
+});
+
+describe("a USDT match", () => {
+  const stake = 1 * USDT_UNIT;
+  const opening = 10 * USDT_UNIT;
+
+  function balances(h: ReturnType<typeof harness>, currency: Currency) {
+    return {
+      alice: readWallet(h.db, "alice", currency),
+      bob: readWallet(h.db, "bob", currency),
+    };
+  }
+
+  it("pays the winner the pot minus the 10% house cut", () => {
+    const h = harness("usdt", stake, opening);
+    h.playRound("Rock", "Scissors");
+    h.playRound("Rock", "Scissors");
+
+    // Pot 2 USDT: the house keeps 0.2, the winner gets 1.8 back (net +0.8).
+    expect(h.overs[0]?.payouts).toEqual([
+      { userId: "alice", delta: 800_000 },
+      { userId: "bob", delta: -1_000_000 },
+    ]);
+    expect(balances(h, "usdt")).toEqual({
+      alice: { available: 10_800_000, locked: 0 },
+      bob: { available: 9_000_000, locked: 0 },
+    });
+    expect(houseTotal(h.db, "usdt")).toBe(200_000);
+    expect(houseTotal(h.db, "rac")).toBe(0);
+  });
+
+  it("never touches RAC", () => {
+    const h = harness("usdt", stake, opening);
+    h.playRound("Paper", "Rock");
+    h.playRound("Paper", "Rock");
+
+    // The harness opens USDT wallets only; no RAC row was created or moved.
+    expect(balances(h, "rac")).toEqual({ alice: undefined, bob: undefined });
+    const racRows = h.db
+      .prepare("SELECT COUNT(*) AS n FROM ledger_entries WHERE currency = 'rac'")
+      .get() as { n: number };
+    expect(racRows.n).toBe(0);
+  });
+
+  it("keeps each player's ledger equal to their balance, and the money adds up", () => {
+    const h = harness("usdt", stake, opening);
+    h.runtime.forfeit("alice", h.matchId);
+
+    for (const userId of ["alice", "bob"]) {
+      const total = h.db
+        .prepare("SELECT COALESCE(SUM(amount), 0) AS t FROM ledger_entries WHERE user_id = ? AND currency = 'usdt'")
+        .get(userId) as { t: number };
+      expect(total.t).toBe(readWallet(h.db, userId, "usdt")?.available);
+    }
+
+    // Nothing created or destroyed: players + house = what was deposited.
+    const players = balances(h, "usdt");
+    expect((players.alice?.available ?? 0) + (players.bob?.available ?? 0) + houseTotal(h.db, "usdt")).toBe(
+      opening * 2,
+    );
+  });
+
+  it("shows the net change after the cut in match history", () => {
+    const h = harness("usdt", stake, opening);
+    h.playRound("Rock", "Scissors");
+    h.playRound("Rock", "Scissors");
+
+    expect(loadMatchHistory(h.db, "alice")[0]).toMatchObject({ currency: "usdt", result: "win", delta: 800_000 });
+    expect(loadMatchHistory(h.db, "bob")[0]).toMatchObject({ currency: "usdt", result: "loss", delta: -1_000_000 });
+  });
+
+  it("takes no cut in RAC", () => {
+    const h = harness("rac");
+    h.playRound("Rock", "Scissors");
+    h.playRound("Rock", "Scissors");
+
+    expect(h.overs[0]?.payouts[0]).toEqual({ userId: "alice", delta: STAKE });
+    expect(houseTotal(h.db, "rac")).toBe(0);
   });
 });

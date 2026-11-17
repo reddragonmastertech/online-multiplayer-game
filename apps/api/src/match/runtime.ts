@@ -15,7 +15,7 @@ import {
   type MatchReveal,
   type MatchState,
   type MoveView,
-  type PlayableCurrency,
+  type Currency,
   type PlayableGameId,
   type PlayableRpsMode,
   type RpsHand,
@@ -23,7 +23,7 @@ import {
 } from "@game-platform/shared";
 import type { AppDatabase } from "../db/client";
 import { withTransaction } from "../db/client";
-import { settleRacMatch } from "../economy/wallet";
+import { settleMatch } from "../economy/wallet";
 
 const TICK_MS = 250;
 
@@ -41,7 +41,7 @@ export type LiveMatch = {
   matchId: string;
   gameId: PlayableGameId;
   mode: PlayableRpsMode;
-  currency: PlayableCurrency;
+  currency: Currency;
   stake: number;
   players: Record<Seat, LivePlayer>;
   state: RpsState;
@@ -215,8 +215,9 @@ export function createMatchRuntime(deps: {
     let payouts: MatchOver["payouts"] = [];
 
     try {
-      const settlement = settleRacMatch(db, {
+      const settlement = settleMatch(db, {
         matchId: match.matchId,
+        currency: match.currency,
         stake: match.stake,
         winnerUserId: winner.userId,
         loserUserId: loser.userId,
@@ -351,7 +352,7 @@ export function createMatchRuntime(deps: {
       matchId: string;
       gameId: PlayableGameId;
       mode: PlayableRpsMode;
-      currency: PlayableCurrency;
+      currency: Currency;
       stake: number;
       players: Record<Seat, { userId: string; name: string }>;
     }) {

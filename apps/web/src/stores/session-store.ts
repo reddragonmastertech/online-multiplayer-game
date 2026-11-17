@@ -1,4 +1,4 @@
-import type { AuthSuccess, LoginRequest, SignupRequest, User, Wallet } from "@game-platform/shared";
+import type { AuthSuccess, Currency, LoginRequest, SignupRequest, User, Wallet } from "@game-platform/shared";
 import { create } from "zustand";
 import { getStoredToken, loginRequest, meRequest, setStoredToken, signupRequest } from "@/lib/api";
 import { closeSocket } from "@/lib/socket";
@@ -27,8 +27,9 @@ function applyAuth(auth: AuthSuccess): Pick<SessionState, "token" | "user" | "wa
   };
 }
 
-export function racAvailable(wallets: Wallet[]) {
-  return wallets.find((wallet) => wallet.currency === "rac")?.available ?? 0;
+/** Spendable balance in one currency, in its smallest units. */
+export function availableIn(wallets: Wallet[], currency: Currency) {
+  return wallets.find((wallet) => wallet.currency === currency)?.available ?? 0;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -51,7 +52,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       set({ status: "ready", token: null, user: null, wallets: [] });
     }
   },
-  /** Re-reads the authoritative wallet after the server moves RAC. */
+  /** Re-reads the authoritative wallet after the server moves money. */
   refresh: async () => {
     if (!get().token) return;
 

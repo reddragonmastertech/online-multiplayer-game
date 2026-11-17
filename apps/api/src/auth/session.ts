@@ -1,5 +1,6 @@
-import type { User, Wallet } from "@game-platform/shared";
+import type { User } from "@game-platform/shared";
 import type { AppDatabase } from "../db/client";
+import { readWallets } from "../economy/wallet";
 
 type UserRow = {
   id: string;
@@ -7,11 +8,6 @@ type UserRow = {
   email: string;
   created_at: string;
   password_hash?: string;
-};
-
-type WalletRow = {
-  available: number;
-  locked: number;
 };
 
 export function toPublicUser(row: {
@@ -29,16 +25,6 @@ export function toPublicUser(row: {
   };
 }
 
-export function toPublicWallets(row: { available: number; locked: number } | undefined): Wallet[] {
-  return [
-    {
-      currency: "rac",
-      available: row?.available ?? 0,
-      locked: row?.locked ?? 0,
-    },
-  ];
-}
-
 export function findUserByEmail(db: AppDatabase, email: string) {
   return db
     .prepare("SELECT id, name, email, password_hash, created_at FROM users WHERE email = ?")
@@ -54,12 +40,8 @@ export function loadAccount(db: AppDatabase, userId: string) {
     return undefined;
   }
 
-  const wallet = db
-    .prepare("SELECT available, locked FROM wallets WHERE user_id = ? AND currency = 'rac'")
-    .get(userId) as WalletRow | undefined;
-
   return {
     user: toPublicUser(user),
-    wallets: toPublicWallets(wallet),
+    wallets: readWallets(db, userId),
   };
 }

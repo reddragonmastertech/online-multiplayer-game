@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import {
   apiPaths,
   loginRequestSchema,
-  MATCH_RULES,
   signupRequestSchema,
 } from "@game-platform/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -20,7 +19,8 @@ import {
 import { loadMatchHistory } from "../match/history";
 import { readBearerToken, signAccessToken, verifyAccessToken } from "./jwt";
 import { hashPassword, verifyPassword } from "./password";
-import { findUserByEmail, loadAccount, toPublicUser, toPublicWallets } from "./session";
+import { openWallets, readWallets } from "../economy/wallet";
+import { findUserByEmail, loadAccount, toPublicUser } from "./session";
 
 function uniqueConstraintColumn(error: unknown) {
   if (!(error instanceof Error) || !error.message.includes("UNIQUE constraint failed")) {
@@ -117,12 +117,7 @@ export async function registerAuthRoutes(
           db.prepare(
             "INSERT INTO users (id, name, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
           ).run(user.id, user.name, user.email, user.passwordHash, user.createdAt);
-          db.prepare(
-            "INSERT INTO wallets (user_id, currency, available, locked) VALUES (?, 'rac', ?, 0)",
-          ).run(user.id, MATCH_RULES.signupBonusRac);
-          db.prepare(
-            "INSERT INTO ledger_entries (id, user_id, currency, kind, amount, match_id, created_at) VALUES (?, ?, 'rac', 'signup_bonus', ?, NULL, ?)",
-          ).run(randomUUID(), user.id, MATCH_RULES.signupBonusRac, now);
+          openWallets(db, user.id, now);
         });
       } catch (error) {
         const column = uniqueConstraintColumn(error);
@@ -138,7 +133,7 @@ export async function registerAuthRoutes(
       return {
         token: signAccessToken({ sub: user.id, name: user.name, email: user.email }, jwtSecret),
         user: toPublicUser(user),
-        wallets: toPublicWallets({ available: MATCH_RULES.signupBonusRac, locked: 0 }),
+        wallets: readWallets(db, user.id),
       };
     });
   });

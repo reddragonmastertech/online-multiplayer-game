@@ -205,7 +205,8 @@ restore the backup, then check out the old version.
 
 ## What is deliberately missing
 
-Nothing here handles real money. RAC is play-only credit with no cash value and
-no withdrawal path. There is no email verification, no password reset, and no
+USDT rooms are real money, but there is no deposit or withdrawal path yet: a
+USDT balance only changes through matches or by hand with `pnpm balance`. Back
+up `game.db` before any hand correction. There is no email verification, no password reset, and no
 moderation tooling. Treat the deployment as a test among people you know, not a
 public launch.

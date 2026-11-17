@@ -1,14 +1,28 @@
-import { MATCH_RULES, type QueueEntry } from "@game-platform/shared";
+import {
+  CURRENCY_RULES,
+  MATCH_RULES,
+  formatAmount,
+  houseCutPercent,
+  stakesFor,
+  winnerTakes,
+  type Currency,
+  type QueueEntry,
+} from "@game-platform/shared";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { GameArt } from "@/components/catalog/game-art";
 import { MatchClosed } from "@/components/match/match-closed";
 import { Button } from "@/components/ui/button";
 import { findCatalogGame } from "@/lib/catalog";
-import { racAvailable, useSessionStore } from "@/stores/session-store";
+import { availableIn, useSessionStore } from "@/stores/session-store";
 import { useQueueStore } from "@/stores/queue-store";
 import { useUiStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
+
+const currencyTabs: { id: Currency; title: string; detail: string }[] = [
+  { id: "rac", title: "RAC", detail: "Free play" },
+  { id: "usdt", title: "USDT", detail: "Paid play" },
+];
 
 const modes = [
   { id: "first-to-2", title: "Best of 3", detail: "First to win 2 rounds takes the match.", live: true },
@@ -42,7 +56,8 @@ export function GameLobbyPage() {
   const navigate = useNavigate();
   const game = findCatalogGame(gameId);
   const [mode, setMode] = useState<(typeof modes)[number]["id"]>("first-to-2");
-  const [stake, setStake] = useState<number>(MATCH_RULES.racStakes[0]);
+  const [currency, setCurrency] = useState<Currency>("rac");
+  const [stake, setStake] = useState<number>(stakesFor("rac")[0] ?? 1);
   const user = useSessionStore((state) => state.user);
   const wallets = useSessionStore((state) => state.wallets);
   const openAuth = useUiStore((state) => state.openAuth);
@@ -56,7 +71,9 @@ export function GameLobbyPage() {
   const resetQueue = useQueueStore((state) => state.reset);
 
   const elapsed = useElapsedSeconds(queueStatus === "searching" ? queuedAt : null);
-  const available = racAvailable(wallets);
+  const available = availableIn(wallets, currency);
+  const rules = CURRENCY_RULES[currency];
+  const money = (amount: number) => formatAmount(currency, amount);
 
   useEffect(() => {
     if (!user) resetQueue();
@@ -97,7 +114,7 @@ export function GameLobbyPage() {
     : !selected?.live
       ? "That mode is not on this build."
       : !canAffordStake
-        ? `You need ${stake} RAC available. You have ${available} RAC.`
+        ? `You need ${money(stake)} available. You have ${money(available)}.`
         : null;
 
   function handleJoin() {
@@ -109,7 +126,7 @@ export function GameLobbyPage() {
     const entry: QueueEntry = {
       gameId: "rps",
       mode: "first-to-2",
-      currency: "rac",
+      currency,
       stake,
     };
 
@@ -165,14 +182,45 @@ export function GameLobbyPage() {
             </div>
 
             <h2 className="mt-8 text-sm font-semibold tracking-[0.16em] text-muted-foreground">
+              FREE OR PAID
+            </h2>
+            <div className="mt-3 grid grid-cols-2 gap-3" role="radiogroup" aria-label="Currency">
+              {currencyTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={currency === tab.id}
+                  disabled={searching}
+                  onClick={() => {
+                    if (tab.id === currency) return;
+                    setCurrency(tab.id);
+                    setStake(stakesFor(tab.id)[0] ?? 0);
+                  }}
+                  className={cn(
+                    "rounded-2xl border p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    currency === tab.id ? "border-primary bg-elevated" : "border-border bg-card",
+                    searching && "opacity-60",
+                  )}
+                >
+                  <p className="font-display text-2xl font-bold">{tab.title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {tab.detail}
+                    {user ? ` · ${formatAmount(tab.id, availableIn(wallets, tab.id))}` : ""}
+                  </p>
+                </button>
+              ))}
+            </div>
+
+            <h2 className="mt-8 text-sm font-semibold tracking-[0.16em] text-muted-foreground">
               CHOOSE YOUR STAKE
             </h2>
             <div
               className="mt-3 grid gap-3 sm:grid-cols-3"
               role="radiogroup"
-              aria-label="RAC stake"
+              aria-label={`${rules.label} stake`}
             >
-              {MATCH_RULES.racStakes.map((amount) => (
+              {stakesFor(currency).map((amount) => (
                 <button
                   key={amount}
                   type="button"
@@ -186,22 +234,37 @@ export function GameLobbyPage() {
                     searching && "opacity-60",
                   )}
                 >
-                  <p className="font-display text-2xl font-bold">
-                    {amount} RAC
-                  </p>
+                  <p className="font-display text-2xl font-bold">{money(amount)}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Winner takes {amount * 2} RAC
+                    Winner takes {money(winnerTakes(currency, amount))}
                   </p>
                   {user && available < amount ? (
-                    <p className="mt-2 text-xs font-semibold text-danger">Not enough RAC</p>
+                    <p className="mt-2 text-xs font-semibold text-danger">Not enough {rules.label}</p>
                   ) : null}
                 </button>
               ))}
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">
-              RAC is play-only arena credit. It has no cash value and cannot be withdrawn. Joining
-              locks your stake until the match settles; leaving the queue returns it.
-            </p>
+            {currency === "rac" ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                RAC is play-only arena credit. It has no cash value and cannot be withdrawn. Joining
+                locks your stake until the match settles; leaving the queue returns it.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+                <p>
+                  USDT is the paid version, played for real money. The house keeps{" "}
+                  {houseCutPercent("usdt")}% of the pot: on a {formatAmount("usdt", stakesFor("usdt")[2] ?? 0)}{" "}
+                  match the winner receives {formatAmount("usdt", winnerTakes("usdt", stakesFor("usdt")[2] ?? 0))}.
+                  Joining locks your stake until the match settles; leaving the queue returns it in full.
+                </p>
+                <p>RAC and USDT are separate balances. Neither can be converted into the other.</p>
+                {user && available < (stakesFor("usdt")[0] ?? 0) ? (
+                  <p className="font-semibold text-gold">
+                    USDT top-up is not open yet. Deposits arrive in the next update.
+                  </p>
+                ) : null}
+              </div>
+            )}
 
             {found ? (
               <div className="mt-6 rounded-2xl border border-primary bg-elevated p-5">
@@ -212,15 +275,17 @@ export function GameLobbyPage() {
               <div className="mt-6 rounded-2xl border border-border bg-card p-5">
                 <p className="font-semibold">Looking for an opponent…</p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {stake} RAC locked · searching for {elapsed}s
+                  {money(stake)} locked · searching for {elapsed}s
                 </p>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <Button variant="secondary" onClick={leaveQueue}>
                     Cancel Search
                   </Button>
-                  <Button variant="ghost" asChild>
-                    <Link to="/vs/1-rac">Practice vs CPU instead</Link>
-                  </Button>
+                  {rules.cpuPractice ? (
+                    <Button variant="ghost" asChild>
+                      <Link to="/vs/1-rac">Practice vs CPU instead</Link>
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             ) : (
@@ -228,9 +293,11 @@ export function GameLobbyPage() {
                 <Button size="lg" disabled={Boolean(user) && Boolean(blockedReason)} onClick={handleJoin}>
                   JOIN NOW
                 </Button>
-                <Button size="lg" variant="secondary" asChild>
-                  <Link to="/vs/1-rac">Practice vs CPU</Link>
-                </Button>
+                {rules.cpuPractice ? (
+                  <Button size="lg" variant="secondary" asChild>
+                    <Link to="/vs/1-rac">Practice vs CPU</Link>
+                  </Button>
+                ) : null}
               </div>
             )}
 
@@ -242,7 +309,7 @@ export function GameLobbyPage() {
 
             {user ? (
               <p className="mt-3 text-sm text-muted-foreground">
-                Signed in as {user.name} · {available} RAC available
+                Signed in as {user.name} · {money(available)} available
                 {blockedReason && !searching && !found ? ` · ${blockedReason}` : ""}
               </p>
             ) : (

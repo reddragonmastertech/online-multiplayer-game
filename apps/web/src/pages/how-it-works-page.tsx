@@ -18,8 +18,8 @@ export function HowItWorksPage() {
           <li>
             <h2 className="font-semibold text-foreground">2. Select a mode</h2>
             <p className="mt-2 text-sm">
-              This build supports free Best of 3 (first to 2). Paid stakes and extra modes are listed but
-              not enabled.
+              Best of 3 (first to 2) is live. Play free with RAC, or for real money in USDT rooms, where
+              the house keeps 10% of the pot. Extra modes are listed but not enabled.
             </p>
           </li>
           <li>

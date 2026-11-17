@@ -1,8 +1,9 @@
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
+import { formatAmount } from "@game-platform/shared";
 import { Button } from "@/components/ui/button";
-import { racAvailable, useSessionStore } from "@/stores/session-store";
+import { availableIn, useSessionStore } from "@/stores/session-store";
 import { useUiStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +42,10 @@ function AuthActions({ onNavigate }: { onNavigate?: () => void }) {
         >
           <span className="truncate text-sm font-semibold">{user.name}</span>
           <span className="font-display text-sm font-bold text-primary">
-            {racAvailable(wallets)} RAC
+            {formatAmount("rac", availableIn(wallets, "rac"))}
+          </span>
+          <span className="font-display text-sm font-bold text-gold">
+            {formatAmount("usdt", availableIn(wallets, "usdt"))}
           </span>
         </Link>
         <Button

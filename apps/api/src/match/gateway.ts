@@ -1,12 +1,15 @@
 import {
   chatSendSchema,
   clientEvent,
-  MATCH_RULES,
+  CURRENCY_RULES,
+  formatAmount,
+  isStakeAllowed,
   matchForfeitSchema,
   matchMoveSchema,
   matchWatchSchema,
   queueJoinSchema,
   serverEvent,
+  stakesFor,
   type ClientToServerEvents,
   type ErrorCode,
   type QueueEntry,
@@ -15,7 +18,7 @@ import {
 } from "@game-platform/shared";
 import type { Server, Socket } from "socket.io";
 import type { AppDatabase } from "../db/client";
-import { lockRacStake, refundRacStake } from "../economy/wallet";
+import { lockStake, refundStake } from "../economy/wallet";
 import { createMatchChat } from "./chat";
 import { createMatchQueue, type QueueTicket } from "./queue";
 import { createMatchRuntime, stateFor } from "./runtime";
@@ -87,8 +90,9 @@ export function registerMatchGateway(
   }
 
   function releaseTicket(ticket: QueueTicket, reason: string) {
-    const result = refundRacStake(db, {
+    const result = refundStake(db, {
       userId: ticket.userId,
+      currency: ticket.entry.currency,
       stake: ticket.entry.stake,
       matchId: null,
     });
@@ -383,11 +387,12 @@ export function registerMatchGateway(
       }
 
       const entry = parsed.data;
-      if (!MATCH_RULES.racStakes.includes(entry.stake as 1 | 5 | 10)) {
+      if (!isStakeAllowed(entry.currency, entry.stake)) {
+        const allowed = stakesFor(entry.currency).map((stake) => formatAmount(entry.currency, stake, { unit: false }));
         fail(
           socket,
           "invalid_input",
-          `Stake must be one of ${MATCH_RULES.racStakes.join(", ")} RAC.`,
+          `Stake must be one of ${allowed.join(", ")} ${CURRENCY_RULES[entry.currency].label}.`,
         );
         return;
       }
@@ -405,14 +410,14 @@ export function registerMatchGateway(
         releaseTicket(existing, "reconnect");
       }
 
-      const lock = lockRacStake(db, { userId: socket.data.userId, stake: entry.stake });
+      const lock = lockStake(db, { userId: socket.data.userId, currency: entry.currency, stake: entry.stake });
       if (!lock.ok) {
         fail(
           socket,
           lock.reason === "no_wallet" ? "unauthorized" : "insufficient_balance",
           lock.reason === "no_wallet"
-            ? "That account has no RAC wallet."
-            : `You need ${entry.stake} RAC available to join.`,
+            ? `That account has no ${CURRENCY_RULES[entry.currency].label} wallet.`
+            : `You need ${formatAmount(entry.currency, entry.stake)} available to join.`,
         );
         return;
       }

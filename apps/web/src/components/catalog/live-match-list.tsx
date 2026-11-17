@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { liveMatchesRequest } from "@/lib/api";
+import { potLabel } from "@/lib/match-money";
 
 const POLL_MS = 5000;
 
@@ -61,7 +62,7 @@ export function LiveMatchCard({ match }: { match: LiveMatchSummary }) {
       </div>
 
       <p className="mt-3 text-xs text-muted-foreground">
-        Round {match.round} · first to {match.firstTo} · pot {match.pot} RAC
+        Round {match.round} · first to {match.firstTo} · {potLabel(match, "pot")}
       </p>
 
       <Button className="mt-4 w-full" variant="secondary" asChild>

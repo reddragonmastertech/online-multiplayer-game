@@ -88,6 +88,27 @@ export const migrations: readonly Migration[] = [
       )`,
     ],
   },
+  {
+    // The paid version. Every existing account gets a USDT wallet at 0, and
+    // the house's cut of USDT matches gets its own ledger. RAC is untouched.
+    version: 2,
+    name: "usdt wallets and house ledger",
+    statements: [
+      `INSERT INTO wallets (user_id, currency, available, locked)
+       SELECT id, 'usdt', 0, 0 FROM users
+       WHERE NOT EXISTS (
+         SELECT 1 FROM wallets WHERE wallets.user_id = users.id AND wallets.currency = 'usdt'
+       )`,
+      `CREATE TABLE house_ledger (
+        id TEXT PRIMARY KEY,
+        currency TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        match_id TEXT REFERENCES matches (id),
+        created_at TEXT NOT NULL
+      )`,
+    ],
+  },
 ];
 
 export function schemaVersion(client: SqliteClient) {

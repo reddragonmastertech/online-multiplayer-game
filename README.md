@@ -1,15 +1,18 @@
 # PvP Arena
 
 A multiplayer game platform where two people play Rock Paper Scissors against
-each other for RAC, a play-only arena credit. The server owns the clock, the
-hands and the payout; the browser only sends intent.
+each other, free for RAC (a play-only arena credit) or paid for USDT. The
+server owns the clock, the hands and the payout; the browser only sends intent.
 
 Rock Paper Scissors is the first game, not the point. The lobby, match room,
 spectator view and account area are game-agnostic so chess or a 4×4 game can be
 added without rewriting navigation, matchmaking or the wallet.
 
-> **RAC has no cash value and cannot be withdrawn.** There is no payment
-> integration and no real-money play. See [What this is not](#what-this-is-not).
+> **RAC and USDT are separate balances that never convert.** RAC is free and
+> has no cash value. USDT rooms are played for real money, with a 10% house cut
+> of the pot. USDT deposits and withdrawals are not built yet
+> ([Roadmap 4.2](docs/Roadmap.md)); until then a USDT balance only changes by
+> hand with `pnpm balance`.
 
 ---
 
@@ -54,6 +57,7 @@ Builds the site and serves everything — pages, API and websockets — from
 | `pnpm typecheck` | TypeScript across every package |
 | `pnpm test` | Unit tests (engine, queue, wallet, server) |
 | `pnpm build` | Build everything |
+| `pnpm --filter @game-platform/api balance -- "<name>" [rac\|usdt <amount>]` | Show a player's balances, or correct one by hand (writes an `adjustment` ledger row) |
 
 From `apps/web`:
 
@@ -149,17 +153,20 @@ from button press to payout.
 - Best of 3, first to 2 wins. A draw scores nothing.
 - 10 seconds per round. A missing hand is chosen at random.
 - Hands stay hidden until both are in or the clock runs out.
-- Stakes are 1, 5 or 10 RAC. New accounts start with 100 RAC.
-- Winner takes both stakes. There is no rake.
+- RAC (free): stakes 1, 5 or 10. New accounts start with 100 RAC. Winner takes
+  both stakes; no house cut.
+- USDT (paid): stakes 0.2, 0.5, 1, 2, 5 or 10. New accounts start with 0.
+  The house keeps 10% of the pot: a 1 USDT match pays the winner 1.8.
+- RAC and USDT players are never matched with each other.
 - Disconnect: 20 seconds of grace, then forfeit.
 
 ---
 
 ## What this is not
 
-- **Not real money.** RAC is play-only credit. No deposits, no withdrawals, no
-  payment processor. Adding one would make this a regulated product in most
-  places and needs legal review first.
+- **No USDT deposits or withdrawals yet.** USDT rooms work, but money only gets
+  in or out by hand (`pnpm --filter @game-platform/api balance`). On-chain
+  deposits and hand-approved withdrawals are Roadmap 4.2 parts B and C.
 - **No email verification, password reset, or moderation tools.**
 - **Not multi-instance.** See the hosting note above.
 - Chess and 4×4 appear in the catalog as `Coming soon` and are not playable.

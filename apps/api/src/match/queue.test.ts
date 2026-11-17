@@ -51,6 +51,16 @@ describe("match queue", () => {
     expect(queue.waitingFor(fiveRac)).toBe(1);
   });
 
+  it("does not pair across currencies, even on the same stake", () => {
+    const queue = createMatchQueue();
+    const oneUsdtUnits: QueueEntry = { ...oneRac, currency: "usdt" };
+
+    expect(queue.join(ticket("a", oneRac)).kind).toBe("waiting");
+    expect(queue.join(ticket("b", oneUsdtUnits)).kind).toBe("waiting");
+    expect(queue.waitingFor(oneRac)).toBe(1);
+    expect(queue.waitingFor(oneUsdtUnits)).toBe(1);
+  });
+
   it("refuses a second ticket for the same user so nobody plays themselves", () => {
     const queue = createMatchQueue();
 

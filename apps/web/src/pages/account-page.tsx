@@ -1,9 +1,9 @@
-import type { MatchHistoryEntry } from "@game-platform/shared";
+import { CURRENCY_RULES, currencies, formatAmount, type MatchHistoryEntry } from "@game-platform/shared";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { matchHistoryRequest } from "@/lib/api";
-import { racAvailable, useSessionStore } from "@/stores/session-store";
+import { useSessionStore } from "@/stores/session-store";
 import { useUiStore } from "@/stores/ui-store";
 
 function MatchHistory({ matches }: { matches: MatchHistoryEntry[] | null }) {
@@ -42,10 +42,10 @@ function MatchHistory({ matches }: { matches: MatchHistoryEntry[] | null }) {
             </span>
           ) : null}
           <span className="ml-auto text-sm font-semibold">
-            {match.delta > 0 ? `+${match.delta}` : match.delta} RAC
+            {formatAmount(match.currency, match.delta, { sign: true })}
           </span>
           <span className="w-full text-xs text-muted-foreground">
-            {new Date(match.finishedAt).toLocaleString()} · {match.stake} RAC stake
+            {new Date(match.finishedAt).toLocaleString()} · {formatAmount(match.currency, match.stake)} stake
           </span>
         </li>
       ))}
@@ -95,7 +95,7 @@ export function AccountPage() {
         <section className="max-w-md rounded-3xl border border-border bg-card p-8 text-center">
           <h1 className="font-display text-3xl font-bold">Account</h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            Log in to see your name and RAC balance.
+            Log in to see your name and balances.
           </p>
           <div className="mt-6 flex justify-center gap-3">
             <Button onClick={() => openAuth("login")}>Log in</Button>
@@ -107,8 +107,6 @@ export function AccountPage() {
       </div>
     );
   }
-
-  const rac = wallets.find((wallet) => wallet.currency === "rac");
 
   return (
     <div className="min-h-full overflow-y-auto">
@@ -123,15 +121,29 @@ export function AccountPage() {
         <h1 className="mt-4 font-display text-4xl font-bold">{user.name}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{user.email}</p>
 
-        <section className="mt-6 rounded-3xl border border-primary/40 bg-card p-6">
-          <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground">RAC BALANCE</p>
-          <p className="mt-2 font-display text-5xl font-bold text-primary">
-            {racAvailable(wallets)}
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Available {rac?.available ?? 0} · Locked {rac?.locked ?? 0}
-          </p>
-        </section>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          {currencies.map((currency) => {
+            const wallet = wallets.find((item) => item.currency === currency);
+            const paid = currency === "usdt";
+            return (
+              <section
+                key={currency}
+                className={paid ? "rounded-3xl border border-gold/40 bg-card p-6" : "rounded-3xl border border-primary/40 bg-card p-6"}
+              >
+                <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground">
+                  {CURRENCY_RULES[currency].label} BALANCE · {paid ? "PAID" : "FREE"}
+                </p>
+                <p className={paid ? "mt-2 font-display text-5xl font-bold text-gold" : "mt-2 font-display text-5xl font-bold text-primary"}>
+                  {formatAmount(currency, wallet?.available ?? 0, { unit: false })}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Available {formatAmount(currency, wallet?.available ?? 0)} · Locked{" "}
+                  {formatAmount(currency, wallet?.locked ?? 0)}
+                </p>
+              </section>
+            );
+          })}
+        </div>
 
         <section className="mt-4 rounded-3xl border border-border bg-card p-6">
           <h2 className="text-sm font-semibold tracking-[0.16em] text-muted-foreground">MATCH HISTORY</h2>

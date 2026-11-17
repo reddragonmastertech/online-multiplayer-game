@@ -197,29 +197,36 @@ the unit tests and the e2e suite passing.
 
 #### Part A: two currencies in the game
 
-- [ ] **Rules** in `packages/shared/src/rules.ts`: `currency: "RAC" | "USDT"`, a
-      stake list per currency, and the house cut per currency (RAC 0%, USDT
-      10%).
-- [ ] **Migration 2** in `apps/api/src/db/migrate.ts`: one balance per user per
-      currency. The ledger and matches get a `currency` column. Existing
-      balances become RAC; every account gets a USDT balance of 0. A
-      `house` ledger entry records each cut.
-- [ ] **Wallet** (`apps/api/src/wallet/*`): stake lock, payout, cut and refund
+- [x] **Rules** in `packages/shared/src/economy.ts` (`CURRENCY_RULES`): a
+      stake list, a house cut (RAC 0%, USDT 10%) and a signup balance per
+      currency, plus `formatAmount` and `parseAmount`.
+- [x] **Migration 2** in `apps/api/src/db/migrate.ts`. The wallets, ledger and
+      matches already had a `currency` column, so it only gives every existing
+      account a USDT wallet at 0 and adds `house_ledger`, where each cut is
+      recorded. RAC rows are untouched.
+- [x] **Wallet** (`apps/api/src/wallet/*`): stake lock, payout, cut and refund
       per currency. A test checks that no operation ever moves value between
       RAC and USDT.
-- [ ] **Matchmaking** (`apps/api/src/match/queue.ts`): the queue key is game +
+- [x] **Matchmaking** (`apps/api/src/match/queue.ts`): the queue key is game +
       currency + stake, so a RAC player never meets a USDT player.
-- [ ] **Lobby:** RAC and USDT tabs, with both balances in the header. A USDT
-      room you cannot afford shows **Top up** instead of JOIN NOW.
-- [ ] **Match room, result and history** show the currency, and for USDT the
+- [x] **Lobby:** RAC and USDT tabs, with both balances in the header. Until
+      deposits exist, a USDT room you cannot afford disables JOIN NOW and says
+      top-up is not open yet; Part B turns that into a **Top up** button. CPU
+      practice is offered on the RAC tab only.
+- [x] **Match room, result and history** show the currency, and for USDT the
       cut, everywhere an amount appears.
-- [ ] **Tests:** both currencies through the queue, the payout and the e2e
+- [x] **Tests:** both currencies through the queue, the payout and the e2e
       suite; two players on the same stake in different currencies are never
-      paired.
+      paired (`queue.test.ts`, `runtime.test.ts`, `gateway.test.ts`,
+      `e2e/usdt.spec.ts`).
+- [x] **Admin script** `pnpm --filter @game-platform/api balance`: shows a
+      player's balances, or corrects one by hand with an `adjustment` ledger
+      row. It is the "test script" below, and the first piece of part D.
 
 **Done when** two players can finish a USDT match (balances seeded by a test
 script) and the database shows the winner +stake×0.8, the loser −stake and the
-house +stake×0.2, with RAC untouched.
+house +stake×0.2, with RAC untouched. **Done:** `e2e/usdt.spec.ts` plays a
+1 USDT match from 5 USDT each and ends at 5.8 / 4 / house 0.2, RAC still 100.
 
 #### Part B: deposits
 
@@ -272,7 +279,9 @@ The server never holds a private key and never sends money by itself.
 - [ ] **Migration 4:** `withdrawals` (user, amount, network, address, status
       `pending` → `paid` / `rejected`, payout TxID, admin, times).
 - [ ] The user sees each request's status in their wallet history.
-- [ ] Decide the withdrawal minimum and fee before building.
+- [x] Withdrawal rules decided: **minimum 10 USDT, fee 1%**. The fee is taken
+      from the amount requested, so a 10 USDT request locks 10 and pays out
+      9.9.
 
 **Done when** a request goes pending → paid with the balance right at every
 step, and a rejected request returns the full amount.
@@ -286,10 +295,8 @@ step, and a rejected request returns the full amount.
       is logged as an error.
 - [ ] **House earnings:** a total of the cuts, so you can see what to sweep.
 - [ ] **Backups before every upgrade,** now a hard rule rather than advice.
-- [ ] **Legal, before Part B goes live.** Paid entry to PvP matches for USDT
-      prizes counts as gambling in most countries. It usually needs a licence,
-      age and identity checks, and blocking the countries where it is not
-      allowed. Record what was decided in the build log.
+- [x] **Legal, before Part B goes live.** The owner has confirmed that it is
+      legal where the site operates. Recorded in the build log.
 
 ### 4.3 A second game
 
@@ -366,5 +373,4 @@ No second API instance, no Redis, no Supabase. No conversion between RAC and
 USDT, and no automatic payouts: every withdrawal is sent by hand.
 
 USDT is no longer out of scope: it is planned as the paid version in 4.2. The
-legal review described in spec §1 and §10 still has to happen before deposits
-go live.
+owner has confirmed the legal side.

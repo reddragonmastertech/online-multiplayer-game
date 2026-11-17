@@ -56,7 +56,7 @@ TypeScript type from the same definition.
 |---|---|
 | `src/common.ts` | ID types, the list of error codes, the error envelope |
 | `src/auth.ts` | Signup/login bodies, `User`, and `apiPaths` — every REST URL |
-| `src/economy.ts` | `Wallet`, and `MATCH_RULES`: the frozen numbers |
+| `src/economy.ts` | `Wallet`, `MATCH_RULES` (the frozen numbers), and `CURRENCY_RULES`: stakes and house cut per currency, plus `formatAmount` / `parseAmount` |
 | `src/match.ts` | Match state, rounds, history, the live-match summary |
 | `src/socket.ts` | Every socket event name and payload |
 | `src/chat.ts` | Match chat messages, `CHAT_RULES` limits, quick reactions |
@@ -78,6 +78,14 @@ racStakes: [1, 5, 10],
 
 Nothing hardcodes those numbers elsewhere. Change them here and the UI, server
 and tests all follow.
+
+**Two currencies, never mixed.** `CURRENCY_RULES` holds one entry per
+currency. RAC is the free version (signup 100, stakes 1 / 5 / 10, no cut).
+USDT is the paid version (starts at 0, stakes 0.2 / 0.5 / 1 / 2 / 5 / 10, the
+house keeps 10% of the pot). Every amount is a whole number of the
+currency's smallest unit: 1 RAC, or 0.000001 USDT. So a 1 USDT stake is
+`1000000` on the wire and in the database. Use `formatAmount` to show one;
+never divide by hand.
 
 ---
 
@@ -125,7 +133,8 @@ src/
 ├── config.ts         environment variables, validated
 ├── auth/             who you are
 ├── db/               SQLite connection and schema
-├── economy/          RAC: locking, refunding, settling
+├── economy/          money: locking, refunding, settling, per currency
+├── scripts/          admin tools run by hand (`pnpm balance`)
 ├── match/            the queue and the live match loop
 ├── http/             error helpers, serving the built site
 ├── games/            registers the game modules
@@ -158,7 +167,7 @@ Read this file first. It shows the whole assembly in order:
 | `socket.ts` | Checks the same JWT when a socket connects |
 
 Signup and login sit inside rate-limited scopes, because signup is an open
-endpoint that hands out 100 RAC.
+endpoint that hands out 100 RAC. It opens a USDT wallet at 0 too.
 
 ### `db/`
 
@@ -170,16 +179,23 @@ endpoint that hands out 100 RAC.
   again.
 - `schema.ts` — Drizzle table definitions, used for typing.
 
-Six tables: `users`, `wallets`, `ledger_entries`, `matches`, `match_players`,
-`match_rounds`.
+Seven tables: `users`, `wallets` (one row per user per currency),
+`ledger_entries`, `matches` (with the currency), `match_players`,
+`match_rounds`, and `house_ledger` (the house's cut of each USDT match, added
+in migration 2).
 
 ### `economy/wallet.ts` — the money rules
 
-Small file, highest stakes. Three operations:
+Small file, highest stakes. Every operation takes a currency, and none moves
+value between currencies:
 
-- `lockRacStake` — moves RAC from `available` to `locked` when you join a queue
-- `refundRacStake` — moves it back when you leave or a match is abandoned
-- `settleRacMatch` — unlocks both stakes, then moves the loser's to the winner
+- `openWallets` — a RAC and a USDT wallet for a new account (100 and 0)
+- `lockStake` — moves a stake from `available` to `locked` when you join a queue
+- `refundStake` — moves it back, in full, when you leave or a match is abandoned
+- `settleMatch` — unlocks both stakes, moves the loser's to the winner, and
+  takes the house cut from the winner's side (10% of the pot in USDT, none in
+  RAC)
+- `adjustBalance` — a correction by hand, used only by `scripts/adjust-balance.ts`
 
 Two invariants it exists to protect:
 
@@ -188,8 +204,9 @@ Two invariants it exists to protect:
    both succeed on the same balance.
 2. **The ledger explains the balance.** Every entry's `amount` is the change to
    `available`, so a user's entries always sum to their `available`. The two
-   payout rows of a match sum to zero — that is the no-rake rule, visible in
-   the data.
+   payout rows of a match sum to zero. In USDT the winner also gets a
+   `house_cut` row, and the same amount goes to `house_ledger`, so players plus
+   house always add up to what came in.
 
 ### `match/` — the heart of it
 
@@ -323,6 +340,7 @@ Adding chess means writing `chess-board.tsx` and one line in `game-surface.tsx`.
 | `protocol.ts` | Re-exports the shared types for convenience |
 | `catalog.ts` | The game catalog shown in the lobby |
 | `cpu-stakes.ts` | The CPU practice stakes, taken from `MATCH_RULES` |
+| `match-money.ts` | Match title and pot label in the match's currency |
 | `utils.ts` | `cn()` for merging Tailwind classes |
 
 ### `index.css` — the theme
@@ -361,13 +379,13 @@ The useful exercise. A player presses a hand button:
    **`packages/games/rps/engine.ts`** — the only place a winner is decided.
 7. `runtime` writes the round to `match_rounds`, emits `match:reveal` to
    everyone in the room, and pauses for `revealMs`.
-8. If someone has reached 2, it calls `settleRacMatch` in
+8. If someone has reached 2, it calls `settleMatch` in
    **`economy/wallet.ts`**: both stakes unlock, the loser's moves to the
-   winner, four ledger rows, one transaction. Then `match:over`.
+   winner, and in USDT the house cut comes off. One transaction. Then `match:over`.
 9. **`match-store.ts`** stores the result and calls
    `session-store.refresh()`, which re-reads the real balance.
 
-Notice what the browser never does: judge a round, change a score, or move RAC.
+Notice what the browser never does: judge a round, change a score, or move money.
 
 ---
 
@@ -378,11 +396,12 @@ Notice what the browser never does: judge a round, change a score, or move RAC.
 | `packages/games/rps/src/engine.test.ts` | The rules | `pnpm test` |
 | `packages/game-core/src/registry.test.ts` | Game registration | `pnpm test` |
 | `apps/api/src/db/migrate.test.ts` | Fresh, legacy and newer databases; rollback on failure | `pnpm test` |
-| `apps/api/src/economy/wallet.test.ts` | Locking, refunds, ledger | `pnpm test` |
-| `apps/api/src/match/queue.test.ts` | Pairing, no self-pairing | `pnpm test` |
+| `apps/api/src/economy/wallet.test.ts` | Locking, refunds, ledger, the two currencies kept apart | `pnpm test` |
+| `apps/api/src/economy/amount.test.ts` | Stakes, the 10% cut, formatting and parsing amounts | `pnpm test` |
+| `apps/api/src/match/queue.test.ts` | Pairing, no self-pairing, never across currencies | `pnpm test` |
 | `apps/api/src/match/chat.test.ts` | Chat length, rate limit, history | `pnpm test` |
-| `apps/api/src/match/gateway.test.ts` | Real sockets: chat reaches players, never spectators | `pnpm test` |
-| `apps/api/src/match/runtime.test.ts` | Clock, hidden hands, settling | `pnpm test` |
+| `apps/api/src/match/gateway.test.ts` | Real sockets: chat reaches players, never spectators; USDT stakes checked and locked | `pnpm test` |
+| `apps/api/src/match/runtime.test.ts` | Clock, hidden hands, settling in both currencies | `pnpm test` |
 | `apps/api/src/server.test.ts` | Startup, shutdown, rate limits | `pnpm test` |
 | `apps/api/src/http/web.test.ts` | Which URLs are the app vs the API | `pnpm test` |
 | `apps/web/e2e/*.spec.ts` | Two real browsers playing | `pnpm test:e2e` |
@@ -400,6 +419,8 @@ queue, so parallel tests would pair with each other's players.
 | I want to… | Go to |
 |---|---|
 | Change a game rule number | `packages/shared/src/economy.ts` → `MATCH_RULES` |
+| Change a stake or the house cut | `packages/shared/src/economy.ts` → `CURRENCY_RULES` |
+| Correct a player's balance by hand | `pnpm --filter @game-platform/api balance -- "<name>" usdt 5` |
 | Change how RPS is scored | `packages/games/rps/src/engine.ts` |
 | Add an API endpoint | `packages/shared/src/auth.ts` (`apiPaths`), then `apps/api/src/auth/routes.ts` |
 | Add a socket event | `packages/shared/src/socket.ts`, then `apps/api/src/match/gateway.ts` |

@@ -12,6 +12,7 @@ import {
 import { io as connect, type Socket } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
 import { signAccessToken } from "../auth/jwt";
+import { openWallets, readWallets } from "../economy/wallet";
 import { buildServer } from "../server";
 import { createQueuedMatch } from "./store";
 
@@ -179,5 +180,62 @@ describe("match chat over real sockets", () => {
     );
     expect(history.matchId).toBe(matchId);
     expect(history.messages.map((message) => message.text)).toEqual(["remember me"]);
+  });
+});
+
+describe("queue stakes over real sockets", () => {
+  async function signedUpPlayer(server: Awaited<ReturnType<typeof startServer>>, id: string) {
+    server.db
+      .prepare(
+        "INSERT INTO users (id, name, email, password_hash, created_at) VALUES (?, ?, ?, 'x', '2026-01-01T00:00:00.000Z')",
+      )
+      .run(id, `Player ${id}`, `${id}@example.test`);
+    openWallets(server.db, id, "2026-01-01T00:00:00.000Z");
+    return client(server.url, id);
+  }
+
+  const usdtEntry = { gameId: "rps", mode: "first-to-2", currency: "usdt" } as const;
+
+  it("refuses a USDT stake the player cannot cover, and moves nothing", async () => {
+    const server = await startServer();
+    const ann = await signedUpPlayer(server, "ann");
+
+    const refused = nextEvent<ProtocolError>(ann, serverEvent.error);
+    ann.emit(clientEvent.queueJoin, { ...usdtEntry, stake: 200_000 });
+
+    expect(await refused).toMatchObject({ code: "insufficient_balance", message: "You need 0.2 USDT available to join." });
+    expect(readWallets(server.db, "ann")).toEqual([
+      { currency: "rac", available: 100, locked: 0 },
+      { currency: "usdt", available: 0, locked: 0 },
+    ]);
+  });
+
+  it("refuses a stake that is not on that currency's list", async () => {
+    const server = await startServer();
+    const ann = await signedUpPlayer(server, "ann");
+
+    // 5 is a RAC stake. In USDT it would mean 0.000005 USDT.
+    const refused = nextEvent<ProtocolError>(ann, serverEvent.error);
+    ann.emit(clientEvent.queueJoin, { ...usdtEntry, stake: 5 });
+
+    expect(await refused).toMatchObject({
+      code: "invalid_input",
+      message: "Stake must be one of 0.2, 0.5, 1, 2, 5, 10 USDT.",
+    });
+  });
+
+  it("locks a USDT stake the player can cover and leaves RAC alone", async () => {
+    const server = await startServer();
+    const ann = await signedUpPlayer(server, "ann");
+    server.db.prepare("UPDATE wallets SET available = 1000000 WHERE user_id = 'ann' AND currency = 'usdt'").run();
+
+    const waiting = nextEvent(ann, serverEvent.queueWaiting);
+    ann.emit(clientEvent.queueJoin, { ...usdtEntry, stake: 500_000 });
+    await waiting;
+
+    expect(readWallets(server.db, "ann")).toEqual([
+      { currency: "rac", available: 100, locked: 0 },
+      { currency: "usdt", available: 500_000, locked: 500_000 },
+    ]);
   });
 });

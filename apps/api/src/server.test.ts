@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AppConfig } from "./config";
 import type { AppDatabase } from "./db/client";
-import { lockRacStake, readRacWallet } from "./economy/wallet";
+import { lockStake, readWallet } from "./economy/wallet";
 import { createQueuedMatch } from "./match/store";
 import { buildServer } from "./server";
 
@@ -73,8 +73,8 @@ describe("server lifecycle", () => {
     const { app, db } = await buildServer(config);
     seedPlayers(db);
 
-    lockRacStake(db, { userId: "alice", stake: 10 });
-    lockRacStake(db, { userId: "bob", stake: 10 });
+    lockStake(db, { userId: "alice", currency: "rac", stake: 10 });
+    lockStake(db, { userId: "bob", currency: "rac", stake: 10 });
     const { matchId } = createQueuedMatch(db, {
       gameId: "rps",
       mode: "first-to-2",
@@ -86,15 +86,15 @@ describe("server lifecycle", () => {
       ],
     });
 
-    expect(readRacWallet(db, "alice")).toEqual({ available: 90, locked: 10 });
+    expect(readWallet(db, "alice", "rac")).toEqual({ available: 90, locked: 10 });
 
     await app.close();
 
     // Reopen the same file: the refund must be on disk, not just in memory.
     const { app: reopened, db: after } = await buildServer(config);
 
-    expect(readRacWallet(after, "alice")).toEqual({ available: 100, locked: 0 });
-    expect(readRacWallet(after, "bob")).toEqual({ available: 100, locked: 0 });
+    expect(readWallet(after, "alice", "rac")).toEqual({ available: 100, locked: 0 });
+    expect(readWallet(after, "bob", "rac")).toEqual({ available: 100, locked: 0 });
 
     const row = after.prepare("SELECT status FROM matches WHERE id = ?").get(matchId) as {
       status: string;

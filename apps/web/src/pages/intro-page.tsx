@@ -14,7 +14,7 @@ const steps = [
 const faqs = [
   {
     q: "Is it free?",
-    a: "Yes. The playable RPS modes on this build are free. Paid or crypto-staked matches are not available.",
+    a: "RAC rooms are free: every account starts with 100 RAC, which has no cash value. USDT rooms are the paid version, played for real money, with a 10% house cut of the pot. The two balances are separate and never convert.",
   },
   {
     q: "Who can play?",
@@ -25,8 +25,8 @@ const faqs = [
     a: "Players who choose the same game and mode are paired by the server. Online pairing is not live in this build yet.",
   },
   {
-    q: "Are cash games available in my location?",
-    a: "Not on this build. Real-money or USDT play stays off until payments and eligibility are in place.",
+    q: "How do I get USDT?",
+    a: "USDT top-up is not open yet; deposits arrive in the next update. Until then every USDT balance is 0.",
   },
   {
     q: "How do I get help?",
@@ -104,7 +104,7 @@ export function IntroPage() {
           <h2 className="font-display text-3xl font-bold">Fair play</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
             Hands are hidden until both players lock in. The API, not the browser, judges rounds, timers, and
-            results. Rankings and paid modes stay off this build so we do not show numbers we cannot back.
+            results. Rankings stay off this build so we do not show numbers we cannot back.
           </p>
         </section>
 

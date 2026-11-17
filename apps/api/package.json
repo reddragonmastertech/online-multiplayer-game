@@ -10,7 +10,8 @@
     "test": "vitest run",
     "start:e2e": "tsx --env-file=.env.e2e src/index.ts",
     "start:served": "tsx --env-file=.env.served src/index.ts",
-    "start:prod": "tsx --env-file-if-exists=../../.env --env-file-if-exists=.env src/index.ts"
+    "start:prod": "tsx --env-file-if-exists=../../.env --env-file-if-exists=.env src/index.ts",
+    "balance": "tsx --env-file-if-exists=../../.env --env-file-if-exists=.env src/scripts/adjust-balance.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",

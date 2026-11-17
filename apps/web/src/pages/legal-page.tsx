@@ -12,11 +12,11 @@ const docs: Record<string, { title: string; body: string }> = {
   },
   eligibility: {
     title: "Eligibility",
-    body: "Paid or crypto-staked play is not offered here. Eligibility checks will be required before those modes exist.",
+    body: "RAC play is free and open to everyone. USDT rooms are played for real money; only play them where that is allowed for you.",
   },
   "responsible-play": {
     title: "Responsible play",
-    body: "This build is free practice. When paid play exists, limits and help links will live in account settings.",
+    body: "RAC rooms are free practice. In USDT rooms, only stake what you can afford to lose. Limits and help links will live in account settings.",
   },
 };
 

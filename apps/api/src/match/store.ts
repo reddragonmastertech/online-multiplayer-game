@@ -2,14 +2,14 @@ import { randomUUID } from "node:crypto";
 import {
   MATCH_RULES,
   type MatchSummary,
-  type PlayableCurrency,
+  type Currency,
   type PlayableGameId,
   type PlayableRpsMode,
   type Seat,
 } from "@game-platform/shared";
 import type { AppDatabase } from "../db/client";
 import { withTransaction } from "../db/client";
-import { refundRacStake } from "../economy/wallet";
+import { refundStake } from "../economy/wallet";
 
 export function matchRoom(matchId: string) {
   return `match:${matchId}`;
@@ -29,7 +29,7 @@ export type SeatAssignment = {
 export type MatchRecordParams = {
   gameId: PlayableGameId;
   mode: PlayableRpsMode;
-  currency: PlayableCurrency;
+  currency: Currency;
   stake: number;
   players: [SeatAssignment, SeatAssignment];
   now?: string;
@@ -97,6 +97,7 @@ export function toMatchSummary(
 
 type UnsettledRow = {
   id: string;
+  currency: Currency;
   stake: number;
   user_id: string;
 };
@@ -104,12 +105,12 @@ type UnsettledRow = {
 /**
  * Matchmaking and live match state are in-memory, so any match left `queued` or
  * `live` by a previous process can never resume. Refund the locked stakes and
- * cancel it, otherwise a restart would strand a tester's RAC in `locked`.
+ * cancel it, otherwise a restart would strand a player's stake in `locked`.
  */
 export function releaseUnsettledMatches(db: AppDatabase, now = new Date().toISOString()) {
   const rows = db
     .prepare(
-      `SELECT m.id, m.stake, p.user_id
+      `SELECT m.id, m.currency, m.stake, p.user_id
        FROM matches m
        JOIN match_players p ON p.match_id = m.id
        WHERE m.status IN ('queued', 'live')`,
@@ -120,8 +121,9 @@ export function releaseUnsettledMatches(db: AppDatabase, now = new Date().toISOS
   let refunded = 0;
 
   for (const row of rows) {
-    const result = refundRacStake(db, {
+    const result = refundStake(db, {
       userId: row.user_id,
+      currency: row.currency,
       stake: row.stake,
       matchId: row.id,
       now,

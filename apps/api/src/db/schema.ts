@@ -40,6 +40,16 @@ export const ledgerEntries = sqliteTable("ledger_entries", {
   createdAt: text("created_at").notNull(),
 });
 
+/** What the house has earned: the cut of each USDT match. Added in migration 2. */
+export const houseLedger = sqliteTable("house_ledger", {
+  id: text("id").primaryKey(),
+  currency: text("currency").notNull(),
+  kind: text("kind").notNull(),
+  amount: integer("amount").notNull(),
+  matchId: text("match_id"),
+  createdAt: text("created_at").notNull(),
+});
+
 export const matches = sqliteTable("matches", {
   id: text("id").primaryKey(),
   gameId: text("game_id").notNull(),

@@ -2,7 +2,15 @@ import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { assertMigrationOrder, migrateSqlite, migrations, schemaVersion, type Migration } from "./migrate";
 
-const TABLES = ["users", "wallets", "ledger_entries", "matches", "match_players", "match_rounds"];
+const TABLES = [
+  "users",
+  "wallets",
+  "ledger_entries",
+  "matches",
+  "match_players",
+  "match_rounds",
+  "house_ledger",
+];
 
 function tableNames(db: DatabaseSync) {
   return (
@@ -49,6 +57,24 @@ describe("migrateSqlite", () => {
 
     expect(schemaVersion(db)).toBe(migrations.length);
     expect(db.prepare("SELECT name FROM users").all()).toEqual([{ name: "ada" }]);
+  });
+
+  it("gives every existing account a USDT wallet at 0 and leaves RAC alone", () => {
+    const db = new DatabaseSync(":memory:");
+    migrateSqlite(db, migrations.slice(0, 1));
+    db.exec(
+      "INSERT INTO users (id, name, email, password_hash, created_at) VALUES ('u1', 'ada', 'a@x', 'h', 'now')",
+    );
+    db.exec("INSERT INTO wallets (user_id, currency, available, locked) VALUES ('u1', 'rac', 97, 3)");
+
+    expect(migrateSqlite(db)).toEqual([2]);
+
+    expect(
+      db.prepare("SELECT currency, available, locked FROM wallets WHERE user_id = 'u1' ORDER BY currency").all(),
+    ).toEqual([
+      { currency: "rac", available: 97, locked: 3 },
+      { currency: "usdt", available: 0, locked: 0 },
+    ]);
   });
 
   it("applies only the migrations above the current version", () => {

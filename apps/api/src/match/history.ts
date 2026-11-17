@@ -1,11 +1,11 @@
-import type { MatchHistoryEntry } from "@game-platform/shared";
+import type { Currency, MatchHistoryEntry } from "@game-platform/shared";
 import type { AppDatabase } from "../db/client";
 
 type HistoryRow = {
   id: string;
   game_id: string;
   mode: string;
-  currency: string;
+  currency: Currency;
   stake: number;
   status: string;
   winner_seat: string | null;
@@ -17,8 +17,8 @@ type HistoryRow = {
 };
 
 /**
- * Settled matches for one user, newest first. The net RAC change is read back
- * from the ledger rather than inferred from the result, so the number shown
+ * Settled matches for one user, newest first. The net change (payout and, in USDT, the
+ * house cut) is read back from the ledger rather than inferred from the result, so the number shown
  * always matches what actually moved.
  */
 export function loadMatchHistory(
@@ -48,7 +48,7 @@ export function loadMatchHistory(
       .prepare(
         `SELECT COALESCE(SUM(amount), 0) AS total
          FROM ledger_entries
-         WHERE user_id = ? AND match_id = ? AND kind = 'payout'`,
+         WHERE user_id = ? AND match_id = ? AND kind IN ('payout', 'house_cut')`,
       )
       .get(userId, row.id) as { total: number };
 
@@ -56,7 +56,7 @@ export function loadMatchHistory(
       matchId: row.id,
       gameId: "rps",
       mode: "first-to-2",
-      currency: "rac",
+      currency: row.currency,
       stake: row.stake,
       result: won ? "win" : "loss",
       reason: row.status === "forfeited" ? "forfeit" : "completed",

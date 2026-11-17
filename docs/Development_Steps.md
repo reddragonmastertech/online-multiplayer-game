@@ -254,9 +254,39 @@ This reverses "USDT stays hidden". The plan is Roadmap step 4.2.
   user saves their sending wallet, pastes the TxID, and the server verifies it
   on the chain before crediting the amount minus a 1% fee.
 - **Withdrawals are approved by hand.** An admin sends the USDT and marks the
-  request paid. The server never holds a private key.
-- **Legal review is still open** and has to be settled before deposits go
-  live.
+  request paid. The server never holds a private key. Minimum 10 USDT, fee 1%.
+- **Legal:** the owner has confirmed that it is legal where the site operates.
+
+### Roadmap 4.2 part A — USDT rooms
+
+The paid version plays; money cannot get in or out yet except by hand.
+
+- **Most of the schema was already there.** `wallets` was keyed by user and
+  currency, and the ledger and matches carried a `currency` column, but every
+  query said `'rac'`. Migration 2 only adds a USDT wallet at 0 for every
+  existing account and a `house_ledger` table. The wallet functions lost
+  their `Rac` names and each takes a currency.
+- **Amounts are integers of the smallest unit.** 1 RAC, or 0.000001 USDT, so
+  a 1 USDT stake is `1000000`. Every stake and every 10% cut divides exactly,
+  and `formatAmount` / `parseAmount` convert without floating point. One
+  stake schema serves both currencies, which means the server checks each
+  stake against that currency's list: `5` in USDT is refused rather than
+  read as 0.000005 USDT.
+- **The cut comes off the winner's side.** Settlement still writes the same
+  unlock and payout rows; in USDT the winner gets a `house_cut` row as well
+  and the house gets a `house_ledger` row. Players plus house always sum to
+  what came in, and a test checks it. Refunds never take a cut.
+- **The queue needed nothing.** Its key already included the currency.
+- **The lobby has RAC / USDT tabs,** the header shows both balances, and the
+  match room, result, history and live list print amounts in the match's
+  currency. CPU practice stays RAC-only. The FAQ, how-it-works and legal
+  pages no longer say paid play does not exist.
+- **`pnpm balance`** is a hand tool for showing or correcting a balance. Each
+  change is an `adjustment` ledger row. Until deposits land it is the only way
+  to put USDT in, which is how the e2e paid match is set up.
+- **The e2e suite showed load failures** on this machine while about 13 GB of
+  other browser processes were running (`ERR_INSUFFICIENT_RESOURCES`, a
+  crashed worker, 30s timeouts). Every test passed when rerun.
 
 ---
 
@@ -268,7 +298,7 @@ This reverses "USDT stays hidden". The plan is Roadmap step 4.2.
 | Redis | One process; the queue is in memory |
 | Supabase | Our own JWT is enough |
 | Postgres | Would need Docker for no gain yet |
-| USDT, payments | Not built yet. Planned as the paid version (Roadmap 4.2) |
+| USDT deposits and withdrawals | USDT rooms work; deposits and withdrawals are Roadmap 4.2 parts B and C |
 | A second API instance | Would split the queue |
 | Email verification, password reset | Testers use email + password |
 | Chat reporting and moderation | Mute exists; there is nowhere to send a report |

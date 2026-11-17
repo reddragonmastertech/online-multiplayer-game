@@ -1,5 +1,6 @@
 import {
   MATCH_RULES,
+  formatAmount,
   type MatchOver,
   type MatchPlayer,
   type MatchState,
@@ -13,6 +14,7 @@ import { MatchClosed } from "@/components/match/match-closed";
 import { MatchShell } from "@/components/match/match-shell";
 import type { MatchMoveView, MatchSeatView, MatchView } from "@/components/match/match-types";
 import { Button } from "@/components/ui/button";
+import { matchTitle, potLabel } from "@/lib/match-money";
 import { useMatchStore } from "@/stores/match-store";
 import { useSessionStore } from "@/stores/session-store";
 
@@ -59,9 +61,9 @@ function SpectatorRoom({
   const view: MatchView = {
     gameId: state.gameId,
     gameName: "Rock Paper Scissors",
-    title: `${state.stake} RAC MATCH`,
+    title: matchTitle(state),
     modeLabel: `First to ${state.firstTo}`,
-    potLabel: `Pot ${state.pot} RAC`,
+    potLabel: potLabel(state),
     round: state.round,
     firstTo: state.firstTo,
     secondsLeft: state.secondsLeft,
@@ -207,9 +209,9 @@ export function GameRoomPage() {
   const view: MatchView = {
     gameId: state.gameId,
     gameName: "Rock Paper Scissors",
-    title: `${state.stake} RAC MATCH`,
+    title: matchTitle(state),
     modeLabel: `First to ${state.firstTo}`,
-    potLabel: `Pot ${state.pot} RAC`,
+    potLabel: potLabel(state),
     round: state.round,
     firstTo: state.firstTo,
     secondsLeft: state.secondsLeft,
@@ -272,7 +274,7 @@ export function GameRoomPage() {
             </p>
             {yourDelta !== undefined ? (
               <p className="mt-2 font-display text-2xl font-bold text-primary">
-                {yourDelta > 0 ? `+${yourDelta}` : yourDelta} RAC
+                {formatAmount(state.currency, yourDelta, { sign: true })}
               </p>
             ) : (
               <p className="mt-2 text-sm text-danger">
@@ -292,7 +294,7 @@ export function GameRoomPage() {
           <section className="rounded-3xl border border-danger/40 bg-card p-6 text-center">
             <h2 className="font-semibold">Forfeit this match?</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Your {state.stake} RAC stake goes to your opponent. This cannot be undone.
+              Your {formatAmount(state.currency, state.stake)} stake goes to your opponent. This cannot be undone.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-3">
               <Button
@@ -302,7 +304,7 @@ export function GameRoomPage() {
                   setConfirmingExit(false);
                 }}
               >
-                Forfeit and lose {state.stake} RAC
+                Forfeit and lose {formatAmount(state.currency, state.stake)}
               </Button>
               <Button onClick={() => setConfirmingExit(false)}>Keep playing</Button>
             </div>

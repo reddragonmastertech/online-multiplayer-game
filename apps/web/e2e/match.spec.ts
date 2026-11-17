@@ -140,12 +140,12 @@ test("two browsers play a match out and the winner gains the loser's stake", asy
 
     // The balance survives a reload, so it came from the database.
     await alice.goto("/account");
-    await expect(alice.getByText("Available 101 · Locked 0")).toBeVisible();
+    await expect(alice.getByText("Available 101 RAC · Locked 0 RAC")).toBeVisible();
     await expect(alice.getByText(`vs Ben${stamp}`)).toBeVisible();
     await expect(alice.getByText("2–0")).toBeVisible();
 
     await bob.goto("/account");
-    await expect(bob.getByText("Available 99 · Locked 0")).toBeVisible();
+    await expect(bob.getByText("Available 99 RAC · Locked 0 RAC")).toBeVisible();
     await expect(bob.getByText(`vs Ann${stamp}`)).toBeVisible();
   } finally {
     await aliceCtx.close();
