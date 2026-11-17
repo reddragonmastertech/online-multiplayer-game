@@ -18,6 +18,7 @@ import {
 } from "@game-platform/shared";
 import type { Server, Socket } from "socket.io";
 import type { AppDatabase } from "../db/client";
+import { readSiteSettings } from "../admin/settings";
 import { lockStake, refundStake } from "../economy/wallet";
 import { createMatchChat } from "./chat";
 import { createMatchQueue, type QueueTicket } from "./queue";
@@ -387,6 +388,16 @@ export function registerMatchGateway(
       }
 
       const entry = parsed.data;
+      // Site switches: read on every join, so flipping one works at once.
+      const site = readSiteSettings(db);
+      if (site.maintenance) {
+        fail(socket, "queue_unavailable", "The arena is in maintenance. Running matches finish; new ones are paused.");
+        return;
+      }
+      if (entry.currency === "usdt" && !site.usdtRooms) {
+        fail(socket, "queue_unavailable", "USDT rooms are paused right now. RAC rooms are open.");
+        return;
+      }
       if (!isStakeAllowed(entry.currency, entry.stake)) {
         const allowed = stakesFor(entry.currency).map((stake) => formatAmount(entry.currency, stake, { unit: false }));
         fail(

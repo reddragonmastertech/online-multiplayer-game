@@ -23,7 +23,7 @@ import {
 } from "@game-platform/shared";
 import type { AppDatabase } from "../db/client";
 import { withTransaction } from "../db/client";
-import { settleMatch } from "../economy/wallet";
+import { refundStake, settleMatch } from "../economy/wallet";
 
 const TICK_MS = 250;
 
@@ -456,6 +456,49 @@ export function createMatchRuntime(deps: {
       match.players[seat].droppedAt = now();
 
       return match;
+    },
+
+    /**
+     * An admin cancels a running match: both stakes go back in full, nobody
+     * wins, and the match is recorded as cancelled. Players see why.
+     */
+    voidMatch(matchId: string): boolean {
+      const match = live.get(matchId);
+      if (!match || match.phase === "over") return false;
+      const at = new Date(now()).toISOString();
+
+      withTransaction(db, () => {
+        for (const seat of ["a", "b"] as const) {
+          const result = refundStake(db, {
+            userId: match.players[seat].userId,
+            currency: match.currency,
+            stake: match.stake,
+            matchId: match.matchId,
+            now: at,
+          });
+          if (!result.ok) throw new Error(`cannot void ${match.matchId}: stake for seat ${seat} is not locked`);
+        }
+        db.prepare("UPDATE matches SET status = 'cancelled', finished_at = ?, round = ? WHERE id = ?").run(
+          at,
+          match.state.round,
+          match.matchId,
+        );
+      });
+
+      match.phase = "over";
+      broadcastState(match);
+      emit.over(match.matchId, {
+        matchId: match.matchId,
+        winnerSeat: null,
+        reason: "void",
+        payouts: [
+          { userId: match.players.a.userId, delta: 0 },
+          { userId: match.players.b.userId, delta: 0 },
+        ],
+      });
+      log.info({ matchId: match.matchId, stake: match.stake }, "match voided; stakes refunded");
+      forget(match);
+      return true;
     },
 
     matchFor(userId: string) {

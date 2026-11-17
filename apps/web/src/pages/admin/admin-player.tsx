@@ -312,7 +312,9 @@ export function AdminPlayerPage() {
         <ul className="space-y-1 text-sm">
           {player.matches.map((match) => (
             <li key={match.matchId}>
-              {match.result === "win" ? "Win" : "Loss"} vs {match.opponentName} {match.yourScore}–{match.opponentScore} ·{" "}
+              <Link to={`/admin/matches/${match.matchId}`} className="text-primary">
+                {match.result === "win" ? "Win" : "Loss"}
+              </Link> vs {match.opponentName} {match.yourScore}–{match.opponentScore} ·{" "}
               {formatAmount(match.currency, match.delta, { sign: true })} · {when(match.finishedAt)}
             </li>
           ))}

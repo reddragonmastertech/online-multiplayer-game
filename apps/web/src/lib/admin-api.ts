@@ -3,6 +3,10 @@ import {
   type AdminAuditEntry,
   type AdminDashboard,
   type AdminDeposit,
+  type AdminLive,
+  type AdminMatchDetail,
+  type AdminMatchSummary,
+  type SiteSettings,
   type AdminDepositAttempt,
   type AdminManualDeposit,
   type BackupInfo,
@@ -131,3 +135,14 @@ export const adminSweepsRequest = () => adminRequest<{ available: number; sweeps
 export const adminRecordSweep = (amount: number, note: string) =>
   adminRequest<{ available: number; sweeps: HouseSweep[] }>(apiPaths.adminSweeps, post({ amount, note }));
 export const adminBackupNow = () => adminRequest<{ backup: BackupInfo }>(apiPaths.adminBackups, { method: "POST" });
+
+/* D3: game control. */
+export const adminSiteRequest = () => adminRequest<SiteSettings>(apiPaths.adminSite);
+export const adminSaveSite = (settings: SiteSettings) => adminRequest<SiteSettings>(apiPaths.adminSite, post(settings));
+export const adminLiveRequest = () => adminRequest<AdminLive>(apiPaths.adminLive);
+export const adminMatchesRequest = (q: string) =>
+  adminRequest<{ matches: AdminMatchSummary[] }>(`${apiPaths.adminMatches}?q=${encodeURIComponent(q)}`);
+export const adminMatchRequest = (id: string) =>
+  adminRequest<AdminMatchDetail>(apiPaths.adminMatch.replace(":id", encodeURIComponent(id)));
+export const adminVoidMatch = (id: string, reason: string) =>
+  adminRequest<AdminMatchDetail>(apiPaths.adminMatchVoid.replace(":id", encodeURIComponent(id)), post({ reason }));

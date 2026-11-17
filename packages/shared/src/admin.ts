@@ -27,6 +27,8 @@ export const adminPermissions = [
   "money.adjust",
   /** Mark withdrawals paid or rejected. */
   "withdrawals.decide",
+  /** Kill switches, maintenance mode and the announcement banner. */
+  "site.control",
   /** Give and take away admin roles. */
   "admins.manage",
 ] as const;
@@ -34,7 +36,7 @@ export type AdminPermission = (typeof adminPermissions)[number];
 
 export const ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
   owner: adminPermissions,
-  finance: ["view", "players.notes", "money.adjust", "withdrawals.decide"],
+  finance: ["view", "players.notes", "money.adjust", "withdrawals.decide", "site.control"],
   moderator: ["view", "players.notes", "players.moderate"],
   support: ["view"],
 };
@@ -243,3 +245,33 @@ export type SolvencyReport = {
 export type HouseSweep = { id: string; amount: number; note: string; adminName: string; createdAt: string };
 
 export type BackupInfo = { file: string; size: number; createdAt: string; by: string | null };
+
+/* ---------- D3: game control ---------- */
+
+export const adminVoidSchema = z.object({ reason });
+export type AdminVoid = z.infer<typeof adminVoidSchema>;
+
+export type AdminMatchPlayer = { userId: string; name: string; seat: "a" | "b"; score: number };
+
+export type AdminMatchSummary = {
+  id: string;
+  currency: Currency;
+  stake: number;
+  status: string;
+  round: number;
+  winnerSeat: "a" | "b" | null;
+  createdAt: string;
+  finishedAt: string | null;
+  players: AdminMatchPlayer[];
+  /** Still running in this process right now. */
+  live: boolean;
+};
+
+export type AdminMatchDetail = AdminMatchSummary & {
+  rounds: { round: number; handA: string | null; handB: string | null; outcome: string | null; createdAt: string }[];
+};
+
+export type AdminLive = {
+  matches: AdminMatchSummary[];
+  queue: { userId: string; name: string; currency: Currency; stake: number; queuedAt: string }[];
+};

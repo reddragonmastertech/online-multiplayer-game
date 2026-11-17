@@ -406,6 +406,29 @@ player search and a player page with every action.
 - **Backups are automatic:** an hourly check takes a `VACUUM INTO` copy when
   the last one is a day old, keeps 14, and checks the books. Owners can back
   up on demand; the dashboard warns when there is none or it is stale.
+
+### Roadmap 4.2 part D3 — game control
+
+- **Site switches live in the database** (`settings`, migration 7) as one
+  JSON value: maintenance, USDT rooms, deposits and withdrawals per network,
+  and the banner. Every check reads them, so a switch works at once in every
+  part of the server with no restart and no cache. Each change is audited
+  with exactly what moved from what to what. `GET /api/site` is public; every
+  page reads it each minute for the banner and to say what is closed.
+- **What each switch stops, and what it does not:** maintenance blocks new
+  matches but lets running ones finish; paused USDT rooms leave RAC open;
+  paused deposits stop player claims but not an admin's manual credit; paused
+  withdrawals stop new requests but not paying open ones. The server refuses
+  each; the lobby, Top Up dialog and withdraw panel also say so up front.
+- **Voiding a match** refunds both stakes in full, records it as cancelled
+  (so it stays out of match history), and tells both players why. The
+  refunds and the status change are one transaction.
+- **`withTransaction` now nests,** using SQLite savepoints. Voiding needed it:
+  the refund helper guards itself with a transaction and is also one step of
+  the void. The inner call becomes a savepoint, so a failed refund still
+  rolls the whole void back. It has its own tests.
+- **The e2e suite resets the switches** before and after each control test,
+  so one failure cannot leave the arena in maintenance for the next test.
 ---
 
 ## Deliberately not built

@@ -18,7 +18,8 @@ import { createChainClient, createFileChainClient } from "./deposits/client";
 import { registerDepositRoutes } from "./deposits/routes";
 import { createDepositService } from "./deposits/service";
 import { createBackup, lastBackup, reconcileUsdt } from "./admin/books";
-import { registerAdminRoutes, registerMoneyRoutes } from "./admin/routes";
+import { createAdminMatches } from "./admin/matches";
+import { registerAdminRoutes, registerControlRoutes, registerMoneyRoutes } from "./admin/routes";
 import { createAdminService } from "./admin/service";
 import { registerWithdrawalRoutes } from "./withdrawals/routes";
 import { createWithdrawalService } from "./withdrawals/service";
@@ -102,6 +103,16 @@ export async function buildServer(config: AppConfig, overrides: { chain?: ChainC
     keep: config.backup?.keep ?? 14,
   };
   registerMoneyRoutes(app, { auth, deposits, chain, addresses: depositConfig.addresses, backup });
+  registerControlRoutes(app, {
+    auth,
+    matches: createAdminMatches({
+      db,
+      isLive: (id) => runtime.get(id) !== null,
+      liveIds: () => runtime.list().map((match) => match.matchId),
+      tickets: () => queue.tickets(),
+    }),
+    voidMatch: (id) => runtime.voidMatch(id),
+  });
 
   // Housekeeping, hourly: a backup when the last one is a day old, and a
   // check that the USDT books balance. Off in tests, which make their own.

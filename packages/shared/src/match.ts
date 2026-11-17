@@ -130,7 +130,8 @@ export const matchRevealSchema = z.object({
 });
 export type MatchReveal = z.infer<typeof matchRevealSchema>;
 
-export const matchOverReasonSchema = z.enum(["completed", "forfeit", "disconnect"]);
+/** `void`: an admin cancelled the match and both stakes went back in full. */
+export const matchOverReasonSchema = z.enum(["completed", "forfeit", "disconnect", "void"]);
 export type MatchOverReason = z.infer<typeof matchOverReasonSchema>;
 
 export const matchOverSchema = z.object({

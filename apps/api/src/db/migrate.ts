@@ -247,6 +247,20 @@ export const migrations: readonly Migration[] = [
       )`,
     ],
   },
+  {
+    // Site switches (kill switches, maintenance, announcement) as JSON under
+    // one key, so a change is one write and survives a restart.
+    version: 7,
+    name: "site settings",
+    statements: [
+      `CREATE TABLE settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_by TEXT REFERENCES users (id),
+        updated_at TEXT NOT NULL
+      )`,
+    ],
+  },
 ];
 
 export function schemaVersion(client: SqliteClient) {

@@ -48,3 +48,13 @@ export async function enterAdmin(page: Page) {
   await page.getByRole("button", { name: "Turn on" }).click();
   await expect(page.getByRole("navigation", { name: "Admin" })).toBeVisible();
 }
+
+/** Back to every switch open and no banner, so one test cannot close the arena for the next. */
+export function resetSiteSettings() {
+  const db = new DatabaseSync(e2eDatabase);
+  try {
+    db.prepare("DELETE FROM settings").run();
+  } finally {
+    db.close();
+  }
+}

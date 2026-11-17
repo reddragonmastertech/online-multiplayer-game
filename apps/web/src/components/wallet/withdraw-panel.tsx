@@ -11,6 +11,7 @@ import {
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { ApiRequestError, requestWithdrawal, withdrawalsRequest } from "@/lib/api";
+import { useSiteStore } from "@/stores/site-store";
 import { cn } from "@/lib/utils";
 
 const statusLabel: Record<WithdrawalRecord["status"], string> = {
@@ -42,6 +43,7 @@ export function WithdrawPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
+  const site = useSiteStore((state) => state.settings);
 
   const load = useCallback(async () => {
     try {
@@ -60,6 +62,7 @@ export function WithdrawPanel({
   const amount = parseAmount("usdt", amountText);
   const validAmount = amount !== undefined && amount > 0 ? amount : undefined;
   const waiting = withdrawals.some((item) => item.status === "pending" || item.status === "processing");
+  const paused = chosen !== null && !site.withdrawals[chosen];
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -125,7 +128,7 @@ export function WithdrawPanel({
               placeholder="10"
               className="h-10 w-full min-w-0 rounded-xl border border-border bg-black/40 px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
             />
-            <Button type="submit" size="sm" className="h-10" disabled={busy || waiting || validAmount === undefined}>
+            <Button type="submit" size="sm" className="h-10" disabled={busy || waiting || paused || validAmount === undefined}>
               Request
             </Button>
           </div>
@@ -140,6 +143,7 @@ export function WithdrawPanel({
           <p className="text-xs text-muted-foreground">
             The amount is locked when you ask. It is sent by hand after a check, usually within a day.
             {waiting ? " You already have a request waiting." : ""}
+            {paused && chosen ? ` ${NETWORK_INFO[chosen].label} withdrawals are paused right now.` : ""}
           </p>
           {error ? (
             <p role="alert" className="text-sm font-semibold text-danger">

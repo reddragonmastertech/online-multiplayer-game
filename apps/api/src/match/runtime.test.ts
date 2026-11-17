@@ -413,3 +413,25 @@ describe("a USDT match", () => {
     expect(houseTotal(h.db, "rac")).toBe(0);
   });
 });
+
+describe("voiding a match", () => {
+  it("returns both stakes in full, names no winner, and keeps it out of history", () => {
+    const h = harness("usdt", 1_000_000, 10_000_000);
+    h.playRound("Rock", "Scissors");
+
+    expect(h.runtime.voidMatch(h.matchId)).toBe(true);
+
+    expect(h.overs[0]).toMatchObject({ winnerSeat: null, reason: "void" });
+    for (const id of ["alice", "bob"]) {
+      expect(readWallet(h.db, id, "usdt")).toEqual({ available: 10_000_000, locked: 0 });
+    }
+    expect(houseTotal(h.db, "usdt")).toBe(0);
+    const row = h.db.prepare("SELECT status FROM matches WHERE id = ?").get(h.matchId) as { status: string };
+    expect(row.status).toBe("cancelled");
+    expect(loadMatchHistory(h.db, "alice")).toEqual([]);
+    expect(h.runtime.size()).toBe(0);
+
+    // Voiding twice does nothing.
+    expect(h.runtime.voidMatch(h.matchId)).toBe(false);
+  });
+});

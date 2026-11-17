@@ -4,7 +4,10 @@ import { AccountPage } from "@/pages/account-page";
 import { AdminAdminsPage } from "@/pages/admin/admin-admins";
 import { AdminAuditPage } from "@/pages/admin/admin-audit";
 import { AdminDashboardPage } from "@/pages/admin/admin-dashboard";
+import { AdminControlPage } from "@/pages/admin/admin-control";
 import { AdminLayout } from "@/pages/admin/admin-layout";
+import { AdminLivePage } from "@/pages/admin/admin-live";
+import { AdminMatchPage } from "@/pages/admin/admin-match";
 import { AdminMoneyPage } from "@/pages/admin/admin-money";
 import { AdminPlayerPage } from "@/pages/admin/admin-player";
 import { AdminPlayersPage } from "@/pages/admin/admin-players";
@@ -47,6 +50,9 @@ export function App() {
             <Route path="players/:id" element={<AdminPlayerPage />} />
             <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
             <Route path="money" element={<AdminMoneyPage />} />
+            <Route path="live" element={<AdminLivePage />} />
+            <Route path="matches/:id" element={<AdminMatchPage />} />
+            <Route path="control" element={<AdminControlPage />} />
             <Route path="audit" element={<AdminAuditPage />} />
             <Route path="admins" element={<AdminAdminsPage />} />
           </Route>

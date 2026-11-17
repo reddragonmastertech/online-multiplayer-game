@@ -87,6 +87,15 @@ Optional:
    record it there as a sweep.
 5. On ERC20 the gas you pay can be more than the 1% fee on a small request.
 
+### In an emergency
+
+`/admin/control` has switches that work at once, with no restart:
+**maintenance** (no new matches; running ones finish), **USDT rooms**, and
+**deposits** and **withdrawals** per network. Use them before anything else
+if something looks wrong with money. A banner there tells players what is
+happening. To end one bad match, open it from `/admin/live` and **Void** it:
+both stakes go back in full.
+
 Never set `DEPOSIT_CHAIN_FAKE_FILE` here. It is for the browser tests, and
 the server refuses to start with it in production.
 

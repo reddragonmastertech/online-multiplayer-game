@@ -41,6 +41,11 @@ export function createMatchQueue() {
   }
 
   return {
+    /** Everyone waiting right now, oldest first. */
+    tickets(): QueueTicket[] {
+      return [...bySocket.values()].sort((a, b) => a.queuedAt.localeCompare(b.queuedAt));
+    },
+
     /**
      * A user holds at most one ticket, which is what stops a player from being
      * paired against themselves across two tabs and from locking twice.

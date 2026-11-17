@@ -17,6 +17,7 @@ import type { AppDatabase } from "../db/client";
 import { withTransaction } from "../db/client";
 import { creditDeposit } from "../economy/wallet";
 import { recordAudit } from "../admin/audit";
+import { readSiteSettings } from "../admin/settings";
 import { HttpError, invalidInput, notFound } from "../http/errors";
 import {
   ChainUnavailableError,
@@ -84,6 +85,7 @@ export function createDepositService(deps: {
   }
 
   function overview(userId: string): DepositOverview {
+    const site = readSiteSettings(db);
     const wallets = db
       .prepare("SELECT network, address FROM deposit_wallets WHERE user_id = ? ORDER BY network")
       .all(userId) as { network: DepositNetwork; address: string }[];
@@ -97,7 +99,8 @@ export function createDepositService(deps: {
     return {
       networks: depositNetworks.map((network) => ({
         network,
-        address: addresses[network] ?? null,
+        // A paused network shows as closed in the Top Up dialog.
+        address: site.deposits[network] ? (addresses[network] ?? null) : null,
         confirmations: NETWORK_INFO[network].confirmations,
       })),
       wallets: wallets.map((wallet) => ({ network: wallet.network, address: wallet.address })),
@@ -166,6 +169,9 @@ export function createDepositService(deps: {
     const ours = addresses[network];
     if (!ours) {
       throw new HttpError(403, "deposit_closed", `${info.label} deposits are not open.`);
+    }
+    if (!readSiteSettings(db).deposits[network]) {
+      throw new HttpError(403, "deposit_closed", `${info.label} deposits are paused right now. Try again later.`);
     }
 
     const txId = normalizeTxId(network, rawTxId);

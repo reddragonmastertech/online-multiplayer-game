@@ -99,7 +99,9 @@ function SpectatorRoom({
           <section className="rounded-3xl border border-border bg-card p-6">
             <h2 className="font-display text-2xl font-bold">Match finished</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {over.reason === "completed"
+              {over.reason === "void"
+                ? "An admin cancelled this match. Both stakes were returned."
+                : over.reason === "completed"
                 ? `Final score ${a.score}–${b.score}.`
                 : over.reason === "forfeit"
                   ? "The match ended by forfeit."
@@ -263,10 +265,12 @@ export function GameRoomPage() {
         {finished ? (
           <section className="rounded-3xl border border-primary/40 bg-card p-6 text-center">
             <h2 className="font-display text-3xl font-bold">
-              {youWon ? "You won" : "You lost"}
+              {over?.reason === "void" ? "Match cancelled" : youWon ? "You won" : "You lost"}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {over?.reason === "forfeit"
+              {over?.reason === "void"
+                ? "An admin cancelled this match. Your stake has been returned in full."
+                : over?.reason === "forfeit"
                 ? "The match ended by forfeit."
                 : over?.reason === "disconnect"
                   ? "The match ended because a player disconnected."

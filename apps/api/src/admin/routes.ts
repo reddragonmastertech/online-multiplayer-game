@@ -12,6 +12,8 @@ import {
   adminRoleUpdateSchema,
   adminStatusSchema,
   adminSweepSchema,
+  adminVoidSchema,
+  siteSettingsSchema,
   apiPaths,
   type AdminPlayerAction,
 } from "@game-platform/shared";
@@ -23,6 +25,9 @@ import type { DepositNetwork } from "@game-platform/shared";
 import type { ChainClient } from "../deposits/chain";
 import type { DepositService } from "../deposits/service";
 import { checkSolvency, createBackup, houseAvailable, listSweeps, recordSweep, reconcileUsdt, type BackupSettings } from "./books";
+import { recordAudit } from "./audit";
+import type { AdminMatches } from "./matches";
+import { readSiteSettings, writeSiteSettings } from "./settings";
 import type { AdminActor, AdminService } from "./service";
 
 async function respond<T>(reply: FastifyReply, work: () => T | Promise<T>) {
@@ -255,6 +260,83 @@ export function registerMoneyRoutes(
     respond(reply, () => {
       const actor = authenticateAdmin(request, auth, "admins.manage");
       return { backup: createBackup(auth.db, deps.backup, actor.userId) };
+    }),
+  );
+}
+
+/** Roadmap 4.2 part D3: site switches, the live view, match search and voiding. */
+export function registerControlRoutes(
+  app: FastifyInstance,
+  deps: {
+    auth: AuthContext;
+    matches: AdminMatches;
+    voidMatch: (matchId: string) => boolean;
+  },
+) {
+  const { auth, matches } = deps;
+
+  // Public: every page reads these for the banner and for what is open.
+  app.get(apiPaths.site, async () => readSiteSettings(auth.db));
+
+  app.get(apiPaths.adminSite, async (request, reply) =>
+    respond(reply, () => {
+      authenticateAdmin(request, auth, "view");
+      return readSiteSettings(auth.db);
+    }),
+  );
+
+  app.post(apiPaths.adminSite, async (request, reply) =>
+    respond(reply, () => {
+      const actor = authenticateAdmin(request, auth, "site.control");
+      const next = parse(siteSettingsSchema, request.body);
+      const saved = writeSiteSettings(auth.db, actor, next);
+      request.log.warn({ adminId: actor.userId, settings: saved }, "site settings changed");
+      return saved;
+    }),
+  );
+
+  app.get(apiPaths.adminLive, async (request, reply) =>
+    respond(reply, () => {
+      authenticateAdmin(request, auth, "view");
+      return matches.live();
+    }),
+  );
+
+  app.get<{ Querystring: { q?: string } }>(apiPaths.adminMatches, async (request, reply) =>
+    respond(reply, () => {
+      authenticateAdmin(request, auth, "view");
+      return { matches: matches.search(String(request.query.q ?? "").slice(0, 120)) };
+    }),
+  );
+
+  app.get<{ Params: { id: string } }>(apiPaths.adminMatch, async (request, reply) =>
+    respond(reply, () => {
+      authenticateAdmin(request, auth, "view");
+      return matches.detail(request.params.id);
+    }),
+  );
+
+  app.post<{ Params: { id: string } }>(apiPaths.adminMatchVoid, async (request, reply) =>
+    respond(reply, () => {
+      const actor = authenticateAdmin(request, auth, "players.moderate");
+      const { reason } = parse(adminVoidSchema, request.body);
+      const before = matches.detail(request.params.id);
+      if (!before.live) throw invalidInput("Only a match that is still running can be voided.");
+      if (!deps.voidMatch(request.params.id)) throw invalidInput("That match has just ended.");
+      recordAudit(auth.db, {
+        adminId: actor.userId,
+        action: "match.voided",
+        targetUserId: before.players[0]?.userId ?? null,
+        details: {
+          matchId: before.id,
+          reason,
+          currency: before.currency,
+          stake: before.stake,
+          players: before.players.map((player) => player.name),
+        },
+        ip: actor.ip,
+      });
+      return matches.detail(request.params.id);
     }),
   );
 }

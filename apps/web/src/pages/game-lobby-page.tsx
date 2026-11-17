@@ -17,6 +17,7 @@ import { findCatalogGame } from "@/lib/catalog";
 import { availableIn, useSessionStore } from "@/stores/session-store";
 import { useQueueStore } from "@/stores/queue-store";
 import { useUiStore } from "@/stores/ui-store";
+import { useSiteStore } from "@/stores/site-store";
 import { cn } from "@/lib/utils";
 
 const currencyTabs: { id: Currency; title: string; detail: string }[] = [
@@ -61,6 +62,7 @@ export function GameLobbyPage() {
   const user = useSessionStore((state) => state.user);
   const wallets = useSessionStore((state) => state.wallets);
   const openAuth = useUiStore((state) => state.openAuth);
+  const site = useSiteStore((state) => state.settings);
 
   const queueStatus = useQueueStore((state) => state.status);
   const queuedAt = useQueueStore((state) => state.queuedAt);
@@ -113,7 +115,11 @@ export function GameLobbyPage() {
     ? "Log in to use JOIN NOW."
     : !selected?.live
       ? "That mode is not on this build."
-      : !canAffordStake
+      : site.maintenance
+        ? "The arena is in maintenance. New matches are paused."
+        : currency === "usdt" && !site.usdtRooms
+          ? "USDT rooms are paused right now. RAC rooms are open."
+          : !canAffordStake
         ? `You need ${money(stake)} available. You have ${money(available)}.`
         : null;
 

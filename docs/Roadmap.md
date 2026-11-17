@@ -382,13 +382,15 @@ the site grows.
 
 ##### D3: Game control (about 2–3 days)
 
-- [ ] **Kill switches,** instant and without a restart: USDT rooms, and
-      deposits and withdrawals per network.
-- [ ] **Maintenance mode:** no new matches; running ones finish.
-- [ ] **Announcement banner** on every page.
-- [ ] **Live matches and the queue,** with player names.
-- [ ] **Void a match:** refund both stakes in full, with a reason.
-- [ ] Match search and a round-by-round view.
+- [x] **Kill switches,** instant and without a restart: USDT rooms, and
+      deposits and withdrawals per network. Owner and Finance can flip them
+      on `/admin/control`; each saves at once and is audited.
+- [x] **Maintenance mode:** no new matches; running ones finish.
+- [x] **Announcement banner** on every page (info or warning style).
+- [x] **Live matches and the queue,** with player names, refreshed every 5
+      seconds on `/admin/live`.
+- [x] **Void a match:** refund both stakes in full, with a reason.
+- [x] Match search and a round-by-round view (`/admin/matches/:id`).
 
 ##### D4: Risk (about 3–4 days)
 

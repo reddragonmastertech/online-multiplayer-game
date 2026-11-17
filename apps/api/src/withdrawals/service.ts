@@ -12,6 +12,7 @@ import {
   type WithdrawalStatus,
 } from "@game-platform/shared";
 import { recordAudit } from "../admin/audit";
+import { readSiteSettings } from "../admin/settings";
 import type { AppDatabase } from "../db/client";
 import { withTransaction } from "../db/client";
 import { ChainUnavailableError, USDT_CONTRACTS, canonicalAddress, toUsdtUnits, type ChainClient } from "../deposits/chain";
@@ -78,6 +79,9 @@ export function createWithdrawalService(deps: { db: AppDatabase; chain: ChainCli
     const frozen = db.prepare("SELECT usdt_frozen FROM users WHERE id = ?").get(userId) as { usdt_frozen: number } | undefined;
     if (frozen?.usdt_frozen === 1) {
       throw new HttpError(403, "forbidden", "Your USDT is frozen. Contact support.");
+    }
+    if (!readSiteSettings(db).withdrawals[network]) {
+      throw new HttpError(403, "forbidden", `${label} withdrawals are paused right now. Try again later.`);
     }
     if (!Number.isSafeInteger(amount) || amount < WITHDRAWAL_RULES.minimum) {
       throw invalidInput(`The minimum withdrawal is ${formatAmount("usdt", WITHDRAWAL_RULES.minimum)}.`);
