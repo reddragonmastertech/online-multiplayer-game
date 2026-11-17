@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { expect, test, type Page } from "@playwright/test";
@@ -12,6 +14,38 @@ import { expect, test, type Page } from "@playwright/test";
 
 const password = "password123";
 const e2eDatabase = resolve(process.cwd(), "../api/data/e2e.db");
+const fakeChainFile = resolve(process.cwd(), "../api/data/e2e-chain.json");
+
+// Must match apps/api/.env.e2e.
+const OUR_TRC20 = "TBXSw8fM4jpQkGc6zZjsVABFpVN7UvXPdV";
+const USDT_TRC20 = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+
+/** A valid Tron address (base58check, 0x41 prefix) for 20 bytes of hex. */
+function tronAddress(hex20: string) {
+  const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  const payload = Buffer.from(`41${hex20}`, "hex");
+  const sha = (bytes: Buffer) => createHash("sha256").update(bytes).digest();
+  const bytes = Buffer.concat([payload, sha(sha(payload)).subarray(0, 4)]);
+  let value = BigInt(`0x${bytes.toString("hex")}`);
+  let text = "";
+  while (value > 0n) {
+    text = alphabet[Number(value % 58n)] + text;
+    value /= 58n;
+  }
+  return text;
+}
+
+/** Puts a transaction "on the chain" for the e2e server to find. */
+function putOnChain(txId: string, entry: unknown) {
+  let entries: Record<string, unknown> = {};
+  try {
+    entries = JSON.parse(readFileSync(fakeChainFile, "utf8")) as Record<string, unknown>;
+  } catch {
+    // First entry.
+  }
+  entries[txId] = entry;
+  writeFileSync(fakeChainFile, JSON.stringify(entries));
+}
 
 async function signUp(page: Page, name: string) {
   await page.goto("/games/rps");
@@ -78,8 +112,9 @@ test("the USDT tab offers the paid stakes and blocks an empty balance", async ({
   }
 
   await expect(page.getByText("The house keeps 10% of the pot")).toBeVisible();
-  await expect(page.getByText("USDT top-up is not open yet.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "JOIN NOW" })).toBeDisabled();
+  // With no USDT, the join button becomes a way to top up.
+  await expect(page.getByRole("button", { name: "JOIN NOW" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Top up USDT" })).toHaveAttribute("href", "/account?topup=usdt");
   // CPU practice is free play only.
   await expect(page.getByRole("link", { name: "Practice vs CPU" })).toHaveCount(0);
 
@@ -140,4 +175,69 @@ test("a paid match pays the winner the pot minus 10% and leaves RAC alone", asyn
 
   await annCtx.close();
   await benCtx.close();
+});
+
+test("a USDT deposit is checked on the chain and credited minus 1%", async ({ page }) => {
+  const stamp = Date.now();
+  const name = `Dee${stamp}`;
+  // A fresh, unique transaction ID per run: the database keeps every credited one.
+  const txId = stamp.toString(16).padStart(64, "0");
+  // A wallet can belong to one account only, and the e2e database outlives a
+  // run, so each run pays from a new address.
+  const PLAYER_TRC20 = tronAddress(stamp.toString(16).padStart(40, "0"));
+
+  await signUp(page, name);
+  await page.getByRole("radio", { name: /^USDT/ }).click();
+  await page.getByRole("link", { name: "Top up USDT" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Top Up By USDT" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("tab", { name: "TRC20" }).click();
+  await expect(dialog.getByTestId("deposit-address")).toHaveText(OUR_TRC20);
+  await expect(dialog.getByText("Note that the minimum amount is: 3 USDT")).toBeVisible();
+
+  // A closed network says so.
+  await dialog.getByRole("tab", { name: "ERC20" }).click();
+  await expect(dialog.getByText("ERC20 deposits are not open yet.")).toBeVisible();
+  await dialog.getByRole("tab", { name: "TRC20" }).click();
+
+  // The TxID box waits for a saved wallet, and a bad address is explained.
+  await expect(dialog.getByLabel("After sending, paste the transaction ID")).toBeDisabled();
+  await dialog.getByLabel(/The TRC20 wallet you will send USDT from/).fill("0x2222222222222222222222222222222222222222");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("not a valid TRC20 address");
+  await dialog.getByLabel(/The TRC20 wallet you will send USDT from/).fill(PLAYER_TRC20);
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog.getByText(PLAYER_TRC20)).toBeVisible();
+
+  // Not on the chain yet.
+  const txBox = dialog.getByLabel("After sending, paste the transaction ID");
+  await txBox.fill(txId);
+  await dialog.getByRole("button", { name: "Confirm" }).click();
+  await expect(dialog.getByRole("status")).toContainText("not on the Tron network yet");
+
+  // Mined, but too shallow.
+  const transfer = { contract: USDT_TRC20, from: PLAYER_TRC20, to: OUR_TRC20, amount: "10000000" };
+  putOnChain(txId, { status: "mined", confirmations: 4, transfers: [transfer] });
+  await dialog.getByRole("button", { name: "Confirm" }).click();
+  await expect(dialog.getByRole("status")).toContainText("Found it: 10 USDT. It has 4 of 19 confirmations.");
+
+  // Confirmed: 10 USDT in, 0.1 fee, 9.9 credited.
+  putOnChain(txId, { status: "mined", confirmations: 25, transfers: [transfer] });
+  await dialog.getByRole("button", { name: "Confirm" }).click();
+  await expect(dialog.getByRole("status")).toContainText("Credited 9.9 USDT (10 USDT received, 0.1 USDT fee).");
+  await expect(page.getByRole("link", { name: new RegExp(`${name}.*100 RAC.*9\.9 USDT`) })).toBeVisible();
+
+  // The same transaction never pays twice.
+  await txBox.fill(txId);
+  await dialog.getByRole("button", { name: "Confirm" }).click();
+  await expect(dialog.getByRole("status")).toContainText("already been credited");
+
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("list", { name: "Deposits" })).toContainText("+9.9 USDT");
+
+  // Back in the lobby the paid rooms are open.
+  await page.goto("/games/rps");
+  await page.getByRole("radio", { name: /^USDT/ }).click();
+  await expect(page.getByRole("button", { name: "JOIN NOW" })).toBeEnabled();
 });

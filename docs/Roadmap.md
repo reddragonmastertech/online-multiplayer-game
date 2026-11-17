@@ -233,34 +233,45 @@ house +stake×0.2, with RAC untouched. **Done:** `e2e/usdt.spec.ts` plays a
 The flow in the payment screenshots: a **USDT** card under Wallet → payment
 method, and a **Top Up By USDT** dialog with **ERC20 / BEP20 / TRC20** tabs.
 
-- [ ] **Settings:** the three receiving addresses come from `.env`
+- [x] **Settings:** the three receiving addresses come from `.env`
       (`USDT_ADDRESS_ERC20`, `USDT_ADDRESS_BEP20`, `USDT_ADDRESS_TRC20`), never
-      from code. Minimum 3 USDT, deposit fee 1%, required confirmations per
-      network. Free API keys for Etherscan and BscScan; TronGrid needs none.
-- [ ] **Save your sending wallet first.** A TxID is public, so anyone could
+      from code, and are checked at startup. Minimum 3 USDT, deposit fee 1%,
+      confirmations 19 (TRC20) / 15 (BEP20) / 12 (ERC20). **No API keys
+      needed:** the server reads receipts over plain JSON-RPC (free public
+      nodes by default, any provider URL can be set) and TronGrid.
+- [x] **Save your sending wallet first.** A TxID is public, so anyone could
       paste someone else's. The server only credits a transfer that came
-      **from** the wallet the user saved for that network.
-- [ ] **Claim by TxID:** the user pays, pastes the transaction ID, and the
+      **from** the wallet the user saved for that network. An
+      address can be saved on one account only.
+- [x] **Claim by TxID:** the user pays, pastes the transaction ID, and the
       server checks it on the chain: sent to our address, the real USDT
       contract (not a look-alike token), from the user's saved wallet, enough
       confirmations, at least the minimum, and never claimed before. It then
       credits **amount − 1%** to the USDT balance.
-- [ ] **Migration 3:** `deposit_wallets` (user, network, address) and
+- [x] **Migration 3:** `deposit_wallets` (user, network, address) and
       `deposits` (TxID **unique**, network, amount, fee, credited, time). The
       ledger credit and the deposit row are written in one transaction, so a
       TxID can never be credited twice.
-- [ ] **Web:** the dialog from the screenshots (address, copy button, QR code,
-      the notes about minimum, confirmation time and fee), the save-wallet
-      step, the TxID box with its status, and a deposit history list.
-- [ ] **Tests** with faked chain answers, so no test touches a real network:
+- [x] **Web:** the dialog from the screenshots (address, copy button, the
+      notes about minimum, confirmation time and fee), the save-wallet step,
+      the TxID box with its status, and a deposit history list on the account
+      page. In the lobby, an unaffordable USDT stake shows **Top up USDT**.
+      **No QR code:** it would need a new library and the screenshots do not
+      have one.
+- [x] **Tests** with faked chain answers, so no test touches a real network:
       a good claim, the same TxID twice, the wrong receiving address, a fake
       token, a transfer from another wallet, below the minimum, and not yet
-      confirmed. One e2e test of the dialog.
-- [ ] Mark ERC20 as expensive: Ethereum gas often costs more than a small
+      confirmed. One e2e test of the dialog
+      (`deposits/service.test.ts`, `routes.test.ts`, `chain.test.ts`,
+      `e2e/usdt.spec.ts`). The real readers were also checked once by hand
+      against live USDT transfers on all three chains.
+- [x] Mark ERC20 as expensive: Ethereum gas often costs more than a small
       deposit. TRC20 and BEP20 are the recommended networks.
 
 **Done when** a real small TRC20 deposit on the live site shows up in the
 user's USDT balance, and claiming the same TxID again is refused.
+**Waiting on the owner:** the receiving addresses in `.env`, a restart, and
+one real deposit of at least 3 USDT.
 
 #### Part C: withdrawals, with manual admin approval
 

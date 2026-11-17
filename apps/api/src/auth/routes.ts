@@ -38,7 +38,7 @@ function uniqueConstraintColumn(error: unknown) {
   return "unknown";
 }
 
-function authenticate(request: FastifyRequest, jwtSecret: string) {
+export function authenticate(request: FastifyRequest, jwtSecret: string) {
   const token = readBearerToken(request.headers.authorization);
   if (!token) {
     throw unauthorized();

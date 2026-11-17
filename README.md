@@ -10,9 +10,8 @@ added without rewriting navigation, matchmaking or the wallet.
 
 > **RAC and USDT are separate balances that never convert.** RAC is free and
 > has no cash value. USDT rooms are played for real money, with a 10% house cut
-> of the pot. USDT deposits and withdrawals are not built yet
-> ([Roadmap 4.2](docs/Roadmap.md)); until then a USDT balance only changes by
-> hand with `pnpm balance`.
+> of the pot. USDT comes in through on-chain deposits (TRC20, BEP20, ERC20).
+> Withdrawals are not built yet ([Roadmap 4.2](docs/Roadmap.md)).
 
 ---
 
@@ -95,6 +94,9 @@ host it. Copy `.env.example` to `.env` in the repository root.
 | `LOGIN_RATE_LIMIT` | `20` | Per IP per minute |
 | `LOG_LEVEL` | `info` | |
 | `WEB_DIST` | `apps/web/dist` | Where the built site is read from |
+| `USDT_ADDRESS_TRC20` / `_BEP20` / `_ERC20` | none | Your USDT receiving address per network. A network without one stays closed. Checked at startup |
+| `ETH_RPC_URL` / `BSC_RPC_URL` | public nodes | Where deposits are read from. Any JSON-RPC provider URL works |
+| `TRONGRID_URL` / `TRONGRID_API_KEY` | `https://api.trongrid.io` / none | Tron deposits. A free key raises TronGrid's limits |
 
 `SENTRY_DSN` (API) and `VITE_SENTRY_DSN` (web) are optional and turn on error
 reporting.
@@ -164,9 +166,9 @@ from button press to payout.
 
 ## What this is not
 
-- **No USDT deposits or withdrawals yet.** USDT rooms work, but money only gets
-  in or out by hand (`pnpm --filter @game-platform/api balance`). On-chain
-  deposits and hand-approved withdrawals are Roadmap 4.2 parts B and C.
+- **No USDT withdrawals yet.** Deposits work; money only goes out by hand
+  (`pnpm --filter @game-platform/api balance`). Hand-approved withdrawals are
+  Roadmap 4.2 part C.
 - **No email verification, password reset, or moderation tools.**
 - **Not multi-instance.** See the hosting note above.
 - Chess and 4×4 appear in the catalog as `Coming soon` and are not playable.

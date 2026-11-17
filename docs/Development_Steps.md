@@ -288,6 +288,40 @@ The paid version plays; money cannot get in or out yet except by hand.
   other browser processes were running (`ERR_INSUFFICIENT_RESOURCES`, a
   crashed worker, 30s timeouts). Every test passed when rerun.
 
+### Roadmap 4.2 part B — USDT deposits
+
+A player pays on-chain, pastes the transaction ID, and the server checks it
+on the chain before crediting amount − 1%.
+
+- **No API keys after all.** The plan assumed Etherscan and BscScan keys.
+  Reading the receipt directly over JSON-RPC (`eth_getTransactionReceipt`)
+  gives the same facts, works with any node, and the defaults are free
+  public endpoints. Tron goes through TronGrid. Swapping in a paid provider
+  is one `.env` line.
+- **The sending wallet is the proof of ownership.** A TxID is public, so the
+  server only credits a transfer that came from the wallet the player saved
+  beforehand, and an address can be saved on one account only. If someone
+  saves another person's address first, the real owner is told it is taken
+  and has to go to support; that is the price of not asking for a signed
+  message.
+- **Checks, in order:** network open, TxID well-formed, wallet saved, not
+  already claimed (all before touching the chain), then on the chain:
+  succeeded, real USDT contract, to our address, from the saved wallet, at
+  least 3 USDT, enough confirmations. "Not found" and "not deep enough" are
+  `deposit_pending`, so the player tries again; nothing is stored for a
+  failed claim.
+- **USDT on BNB Smart Chain has 18 decimals,** not 6. Amounts are converted
+  with BigInt and any dust below 0.000001 USDT is dropped.
+- **A double credit is impossible by construction:** `deposits` has
+  UNIQUE (network, tx_id), and the deposit row, the balance, the ledger row
+  and the fee in `house_ledger` are one transaction.
+- **The browser tests use a fake chain:** `DEPOSIT_CHAIN_FAKE_FILE` points
+  the e2e server at a JSON file the test writes. The config refuses it in
+  production. The real readers were run once by hand against live USDT
+  transfers on Ethereum, BNB Chain and Tron.
+- **No QR code** in the dialog: it would need a new library and the
+  screenshots have none.
+
 ---
 
 ## Deliberately not built
@@ -298,7 +332,7 @@ The paid version plays; money cannot get in or out yet except by hand.
 | Redis | One process; the queue is in memory |
 | Supabase | Our own JWT is enough |
 | Postgres | Would need Docker for no gain yet |
-| USDT deposits and withdrawals | USDT rooms work; deposits and withdrawals are Roadmap 4.2 parts B and C |
+| USDT withdrawals | Rooms and deposits work; hand-approved withdrawals are Roadmap 4.2 part C |
 | A second API instance | Would split the queue |
 | Email verification, password reset | Testers use email + password |
 | Chat reporting and moderation | Mute exists; there is nowhere to send a report |

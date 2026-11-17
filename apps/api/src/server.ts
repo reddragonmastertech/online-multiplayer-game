@@ -10,14 +10,21 @@ import Fastify from "fastify";
 import { Server } from "socket.io";
 import { attachSocketAuth } from "./auth/socket";
 import { registerAuthRoutes } from "./auth/routes";
-import type { AppConfig } from "./config";
+import { defaultDepositConfig, type AppConfig } from "./config";
 import { createDatabase, resolveSqlitePath } from "./db/client";
+import type { ChainClient } from "./deposits/chain";
+import { createChainClient, createFileChainClient } from "./deposits/client";
+import { registerDepositRoutes } from "./deposits/routes";
+import { createDepositService } from "./deposits/service";
 import { registerGames } from "./games/register";
 import { registerWebApp } from "./http/web";
 import { registerMatchGateway } from "./match/gateway";
 import { releaseUnsettledMatches } from "./match/store";
 
-export async function buildServer(config: AppConfig) {
+/**
+ * `chain` replaces the blockchain reader, so tests never touch a real network.
+ */
+export async function buildServer(config: AppConfig, overrides: { chain?: ChainClient } = {}) {
   const app = Fastify({
     logger: { level: config.logLevel },
     // Behind a tunnel or reverse proxy the socket address is the proxy, so
@@ -41,6 +48,18 @@ export async function buildServer(config: AppConfig) {
     signupRateLimit: config.signupRateLimit,
     loginRateLimit: config.loginRateLimit,
   });
+
+  const depositConfig = config.deposits ?? defaultDepositConfig;
+  const chain =
+    overrides.chain ??
+    (depositConfig.fakeChainFile
+      ? createFileChainClient(depositConfig.fakeChainFile)
+      : createChainClient(depositConfig.chain));
+  const deposits = createDepositService({ db, chain, addresses: depositConfig.addresses });
+  await registerDepositRoutes(app, { service: deposits, jwtSecret: config.jwtSecret });
+  if (depositConfig.fakeChainFile) {
+    app.log.warn({ file: depositConfig.fakeChainFile }, "deposits read from a test file, not a real chain");
+  }
 
   const io = new Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>(
     app.server,
@@ -85,6 +104,7 @@ export async function buildServer(config: AppConfig) {
       games: registry.list().map((game) => game.id),
       sqlite: resolveSqlitePath(config.databaseUrl),
       schemaVersion,
+      depositNetworks: Object.keys(depositConfig.addresses),
       web: web.served ? web.root : "not built; run the web dev server instead",
     },
     "game modules registered",

@@ -52,4 +52,7 @@ export const apiPaths = {
   me: "/api/me",
   matches: "/api/matches",
   live: "/api/live",
+  deposits: "/api/deposits",
+  depositWallets: "/api/deposits/wallets",
+  depositClaim: "/api/deposits/claim",
 } as const;

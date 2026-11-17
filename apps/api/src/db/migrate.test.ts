@@ -10,6 +10,8 @@ const TABLES = [
   "match_players",
   "match_rounds",
   "house_ledger",
+  "deposit_wallets",
+  "deposits",
 ];
 
 function tableNames(db: DatabaseSync) {
@@ -67,7 +69,7 @@ describe("migrateSqlite", () => {
     );
     db.exec("INSERT INTO wallets (user_id, currency, available, locked) VALUES ('u1', 'rac', 97, 3)");
 
-    expect(migrateSqlite(db)).toEqual([2]);
+    expect(migrateSqlite(db, migrations.slice(0, 2))).toEqual([2]);
 
     expect(
       db.prepare("SELECT currency, available, locked FROM wallets WHERE user_id = 'u1' ORDER BY currency").all(),

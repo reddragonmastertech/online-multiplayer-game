@@ -50,6 +50,42 @@ export const houseLedger = sqliteTable("house_ledger", {
   createdAt: text("created_at").notNull(),
 });
 
+/** The wallet each player pays deposits from. Added in migration 3. */
+export const depositWallets = sqliteTable(
+  "deposit_wallets",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    network: text("network").notNull(),
+    address: text("address").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.network] }),
+    unique("deposit_wallets_address_unique").on(table.network, table.address),
+  ],
+);
+
+/** Every credited USDT deposit. Added in migration 3. */
+export const deposits = sqliteTable(
+  "deposits",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    network: text("network").notNull(),
+    txId: text("tx_id").notNull(),
+    fromAddress: text("from_address").notNull(),
+    amount: integer("amount").notNull(),
+    fee: integer("fee").notNull(),
+    credited: integer("credited").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [unique("deposits_tx_unique").on(table.network, table.txId)],
+);
+
 export const matches = sqliteTable("matches", {
   id: text("id").primaryKey(),
   gameId: text("game_id").notNull(),

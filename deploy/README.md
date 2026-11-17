@@ -52,6 +52,22 @@ Optional:
 | `WEB_DIST` | `apps/web/dist` | Where the built site is read from. |
 | `SIGNUP_RATE_LIMIT` | `10` | Signups per IP per hour. Each mints 100 RAC. |
 | `LOGIN_RATE_LIMIT` | `20` | Login attempts per IP per minute. |
+| `USDT_ADDRESS_TRC20`, `_BEP20`, `_ERC20` | none | Your USDT receiving addresses. Each network without one stays closed. |
+| `ETH_RPC_URL`, `BSC_RPC_URL` | free public nodes | Where deposits are read from. A provider URL is more reliable. |
+| `TRONGRID_URL`, `TRONGRID_API_KEY` | `https://api.trongrid.io`, none | Tron deposits. |
+
+### Opening USDT deposits
+
+1. Put your receiving addresses in `.env`, one per network you want open.
+   Copy them from your wallet; do not type them. The server checks their
+   shape (and the Tron checksum) at startup and refuses to start on a bad one.
+2. Back up `game.db`, then restart. The startup log lists `depositNetworks`.
+3. Make one small real deposit (at least 3 USDT, TRC20 is cheapest) from a
+   wallet you saved under **Account → Top up**, paste the TxID, and check the
+   balance. Claiming the same TxID again must be refused.
+
+Never set `DEPOSIT_CHAIN_FAKE_FILE` here. It is for the browser tests, and
+the server refuses to start with it in production.
 
 The signup limit is counted per client address, and everyone behind one router
 shares an address. If your testers are all in the same house or office they
@@ -205,8 +221,8 @@ restore the backup, then check out the old version.
 
 ## What is deliberately missing
 
-USDT rooms are real money, but there is no deposit or withdrawal path yet: a
-USDT balance only changes through matches or by hand with `pnpm balance`. Back
-up `game.db` before any hand correction. There is no email verification, no password reset, and no
+USDT rooms and deposits are real money. There is no withdrawal path yet: money
+only goes out by hand with `pnpm balance`. Back up `game.db` before any hand
+correction. There is no email verification, no password reset, and no
 moderation tooling. Treat the deployment as a test among people you know, not a
 public launch.

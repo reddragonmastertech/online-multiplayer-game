@@ -60,6 +60,7 @@ TypeScript type from the same definition.
 | `src/match.ts` | Match state, rounds, history, the live-match summary |
 | `src/socket.ts` | Every socket event name and payload |
 | `src/chat.ts` | Match chat messages, `CHAT_RULES` limits, quick reactions |
+| `src/deposit.ts` | USDT deposits: networks, `DEPOSIT_RULES` (minimum, fee), address and TxID checks, request and response shapes |
 | `src/index.ts` | Re-exports everything; this is what others import |
 
 **Start here when adding a feature.** Define the shape first, then the server
@@ -134,6 +135,7 @@ src/
 ├── auth/             who you are
 ├── db/               SQLite connection and schema
 ├── economy/          money: locking, refunding, settling, per currency
+├── deposits/         USDT deposits: reading chains, checking and crediting claims
 ├── scripts/          admin tools run by hand (`pnpm balance`)
 ├── match/            the queue and the live match loop
 ├── http/             error helpers, serving the built site
@@ -179,10 +181,10 @@ endpoint that hands out 100 RAC. It opens a USDT wallet at 0 too.
   again.
 - `schema.ts` — Drizzle table definitions, used for typing.
 
-Seven tables: `users`, `wallets` (one row per user per currency),
+Nine tables: `users`, `wallets` (one row per user per currency),
 `ledger_entries`, `matches` (with the currency), `match_players`,
-`match_rounds`, and `house_ledger` (the house's cut of each USDT match, added
-in migration 2).
+`match_rounds`, `house_ledger` (the house's cut of each USDT match and each
+deposit fee, migration 2), and `deposit_wallets` and `deposits` (migration 3).
 
 ### `economy/wallet.ts` — the money rules
 
@@ -196,6 +198,8 @@ value between currencies:
   takes the house cut from the winner's side (10% of the pot in USDT, none in
   RAC)
 - `adjustBalance` — a correction by hand, used only by `scripts/adjust-balance.ts`
+- `creditDeposit` — adds a verified deposit to USDT and its fee to the house,
+  inside the transaction that records the deposit
 
 Two invariants it exists to protect:
 
@@ -207,6 +211,23 @@ Two invariants it exists to protect:
    payout rows of a match sum to zero. In USDT the winner also gets a
    `house_cut` row, and the same amount goes to `house_ledger`, so players plus
    house always add up to what came in.
+
+### `deposits/` — USDT in
+
+| File | Role |
+|---|---|
+| `chain.ts` | The `ChainClient` contract, the real USDT contract per network, unit conversion |
+| `evm.ts` | Ethereum and BNB Chain: reads a receipt over JSON-RPC and finds the transfers |
+| `tron.ts` | Tron via TronGrid, plus base58 address conversion |
+| `client.ts` | Picks the real reader, or the JSON-file fake the browser tests use |
+| `service.ts` | The rules: save a sending wallet, check a claim, credit it once |
+| `routes.ts` | `GET /api/deposits`, `POST /api/deposits/wallets`, `POST /api/deposits/claim` |
+
+The player saves the wallet they pay from, sends USDT to our address, then
+pastes the TxID. `service.claim` refuses anything that is not real USDT, to
+our address, from that saved wallet, at least 3 USDT and deep enough, and
+UNIQUE (network, tx_id) makes a second credit impossible. Tests pass a fake
+`ChainClient` to `buildServer`, so no test touches a real network.
 
 ### `match/` — the heart of it
 
@@ -341,6 +362,9 @@ Adding chess means writing `chess-board.tsx` and one line in `game-surface.tsx`.
 | `catalog.ts` | The game catalog shown in the lobby |
 | `cpu-stakes.ts` | The CPU practice stakes, taken from `MATCH_RULES` |
 | `match-money.ts` | Match title and pot label in the match's currency |
+
+The Top Up dialog is `components/wallet/top-up-dialog.tsx`, opened from the
+account page (`/account?topup=usdt`).
 | `utils.ts` | `cn()` for merging Tailwind classes |
 
 ### `index.css` — the theme
@@ -398,6 +422,7 @@ Notice what the browser never does: judge a round, change a score, or move money
 | `apps/api/src/db/migrate.test.ts` | Fresh, legacy and newer databases; rollback on failure | `pnpm test` |
 | `apps/api/src/economy/wallet.test.ts` | Locking, refunds, ledger, the two currencies kept apart | `pnpm test` |
 | `apps/api/src/economy/amount.test.ts` | Stakes, the 10% cut, formatting and parsing amounts | `pnpm test` |
+| `apps/api/src/deposits/*.test.ts` | Deposit claims against a fake chain, the HTTP routes, receipt parsing and Tron addresses | `pnpm test` |
 | `apps/api/src/match/queue.test.ts` | Pairing, no self-pairing, never across currencies | `pnpm test` |
 | `apps/api/src/match/chat.test.ts` | Chat length, rate limit, history | `pnpm test` |
 | `apps/api/src/match/gateway.test.ts` | Real sockets: chat reaches players, never spectators; USDT stakes checked and locked | `pnpm test` |

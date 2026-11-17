@@ -26,7 +26,7 @@ const faqs = [
   },
   {
     q: "How do I get USDT?",
-    a: "USDT top-up is not open yet; deposits arrive in the next update. Until then every USDT balance is 0.",
+    a: "Open your account page and choose Top up: send USDT on TRC20, BEP20 or ERC20 from a wallet you have saved, then paste the transaction ID. Minimum 3 USDT, 1% fee.",
   },
   {
     q: "How do I get help?",

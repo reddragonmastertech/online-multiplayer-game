@@ -17,3 +17,5 @@ Thumbs.db
 *.db-shm
 .cursor
 .claude
+# Fake chain answers written by the browser tests
+apps/api/data/e2e-chain.json

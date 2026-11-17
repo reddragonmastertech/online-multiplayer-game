@@ -1,4 +1,7 @@
+import { depositNetworks } from "@game-platform/shared";
 import { z } from "zod";
+import type { ChainSettings } from "./deposits/client";
+import { isValidAddress, type ReceivingAddresses } from "./deposits/service";
 
 const optionalText = z.preprocess(
   (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
@@ -29,6 +32,17 @@ const envSchema = z.object({
   /** Login attempts allowed per client IP per minute. */
   LOGIN_RATE_LIMIT: z.coerce.number().int().positive().default(20),
   SENTRY_DSN: optionalText,
+  /** Our USDT receiving addresses. A network without one stays closed. */
+  USDT_ADDRESS_TRC20: optionalText,
+  USDT_ADDRESS_BEP20: optionalText,
+  USDT_ADDRESS_ERC20: optionalText,
+  /** JSON-RPC and TronGrid endpoints used to read deposits. Free public ones by default. */
+  ETH_RPC_URL: z.string().url().default("https://ethereum-rpc.publicnode.com"),
+  BSC_RPC_URL: z.string().url().default("https://bsc-rpc.publicnode.com"),
+  TRONGRID_URL: z.string().url().default("https://api.trongrid.io"),
+  TRONGRID_API_KEY: optionalText,
+  /** Browser tests only: read transactions from this JSON file instead of a chain. */
+  DEPOSIT_CHAIN_FAKE_FILE: optionalText,
 });
 
 export type AppConfig = {
@@ -44,6 +58,23 @@ export type AppConfig = {
   signupRateLimit: number;
   loginRateLimit: number;
   sentryDsn?: string;
+  /** Leave out for no receiving addresses and the default public endpoints. */
+  deposits?: DepositConfig;
+};
+
+export type DepositConfig = {
+  addresses: ReceivingAddresses;
+  chain: ChainSettings;
+  fakeChainFile?: string;
+};
+
+export const defaultDepositConfig: DepositConfig = {
+  addresses: {},
+  chain: {
+    ethRpcUrl: "https://ethereum-rpc.publicnode.com",
+    bscRpcUrl: "https://bsc-rpc.publicnode.com",
+    trongridUrl: "https://api.trongrid.io",
+  },
 };
 
 const DEV_JWT_SECRET = "arena-dev-jwt-secret-change-me";
@@ -54,6 +85,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 
   if (!jwtSecret) {
     throw new Error("JWT_SECRET is required in production");
+  }
+
+  const addresses: ReceivingAddresses = {};
+  for (const network of depositNetworks) {
+    const address = parsed[`USDT_ADDRESS_${network.toUpperCase()}` as "USDT_ADDRESS_TRC20"];
+    if (!address) continue;
+    if (!isValidAddress(network, address)) {
+      throw new Error(`USDT_ADDRESS_${network.toUpperCase()} is not a valid ${network.toUpperCase()} address.`);
+    }
+    addresses[network] = address;
+  }
+
+  if (parsed.DEPOSIT_CHAIN_FAKE_FILE && parsed.NODE_ENV === "production") {
+    throw new Error("DEPOSIT_CHAIN_FAKE_FILE is for tests and cannot be used in production.");
   }
 
   return {
@@ -69,5 +114,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     signupRateLimit: parsed.SIGNUP_RATE_LIMIT,
     loginRateLimit: parsed.LOGIN_RATE_LIMIT,
     sentryDsn: parsed.SENTRY_DSN || undefined,
+    deposits: {
+      addresses,
+      chain: {
+        ethRpcUrl: parsed.ETH_RPC_URL,
+        bscRpcUrl: parsed.BSC_RPC_URL,
+        trongridUrl: parsed.TRONGRID_URL,
+        trongridApiKey: parsed.TRONGRID_API_KEY,
+      },
+      fakeChainFile: parsed.DEPOSIT_CHAIN_FAKE_FILE,
+    },
   };
 }

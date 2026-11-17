@@ -1,6 +1,10 @@
 import {
   apiPaths,
   type AuthSuccess,
+  type DepositClaim,
+  type DepositClaimResponse,
+  type DepositOverview,
+  type SaveDepositWallet,
   type LiveMatchesResponse,
   type LoginRequest,
   type MatchHistoryResponse,
@@ -88,4 +92,22 @@ export function matchHistoryRequest() {
 
 export function liveMatchesRequest() {
   return request<LiveMatchesResponse>(apiPaths.live);
+}
+
+export function depositOverviewRequest() {
+  return request<DepositOverview>(apiPaths.deposits);
+}
+
+export function saveDepositWalletRequest(body: SaveDepositWallet) {
+  return request<SaveDepositWallet>(apiPaths.depositWallets, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function claimDepositRequest(body: DepositClaim) {
+  return request<DepositClaimResponse>(apiPaths.depositClaim, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }

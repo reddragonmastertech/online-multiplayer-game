@@ -258,11 +258,6 @@ export function GameLobbyPage() {
                   Joining locks your stake until the match settles; leaving the queue returns it in full.
                 </p>
                 <p>RAC and USDT are separate balances. Neither can be converted into the other.</p>
-                {user && available < (stakesFor("usdt")[0] ?? 0) ? (
-                  <p className="font-semibold text-gold">
-                    USDT top-up is not open yet. Deposits arrive in the next update.
-                  </p>
-                ) : null}
               </div>
             )}
 
@@ -290,9 +285,15 @@ export function GameLobbyPage() {
               </div>
             ) : (
               <div className="mt-6 flex flex-wrap gap-3">
-                <Button size="lg" disabled={Boolean(user) && Boolean(blockedReason)} onClick={handleJoin}>
-                  JOIN NOW
-                </Button>
+                {user && currency === "usdt" && !canAffordStake ? (
+                  <Button size="lg" asChild>
+                    <Link to="/account?topup=usdt">Top up USDT</Link>
+                  </Button>
+                ) : (
+                  <Button size="lg" disabled={Boolean(user) && Boolean(blockedReason)} onClick={handleJoin}>
+                    JOIN NOW
+                  </Button>
+                )}
                 {rules.cpuPractice ? (
                   <Button size="lg" variant="secondary" asChild>
                     <Link to="/vs/1-rac">Practice vs CPU</Link>

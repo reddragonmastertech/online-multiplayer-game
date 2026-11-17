@@ -1,8 +1,17 @@
-import { CURRENCY_RULES, currencies, formatAmount, type MatchHistoryEntry } from "@game-platform/shared";
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import {
+  CURRENCY_RULES,
+  DEPOSIT_RULES,
+  NETWORK_INFO,
+  currencies,
+  formatAmount,
+  type DepositOverview,
+  type MatchHistoryEntry,
+} from "@game-platform/shared";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { matchHistoryRequest } from "@/lib/api";
+import { TopUpDialog, UsdtMark } from "@/components/wallet/top-up-dialog";
+import { depositOverviewRequest, matchHistoryRequest } from "@/lib/api";
 import { useSessionStore } from "@/stores/session-store";
 import { useUiStore } from "@/stores/ui-store";
 
@@ -60,6 +69,30 @@ export function AccountPage() {
   const logout = useSessionStore((state) => state.logout);
   const openAuth = useUiStore((state) => state.openAuth);
   const [matches, setMatches] = useState<MatchHistoryEntry[] | null>(null);
+  const refreshSession = useSessionStore((state) => state.refresh);
+  const [deposits, setDeposits] = useState<DepositOverview | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const topUpOpen = searchParams.get("topup") === "usdt";
+
+  const loadDeposits = useCallback(async () => {
+    try {
+      setDeposits(await depositOverviewRequest());
+    } catch {
+      setDeposits(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) void loadDeposits();
+    else setDeposits(null);
+  }, [user, loadDeposits]);
+
+  function setTopUp(open: boolean) {
+    const next = new URLSearchParams(searchParams);
+    if (open) next.set("topup", "usdt");
+    else next.delete("topup");
+    setSearchParams(next, { replace: true });
+  }
 
   useEffect(() => {
     if (!user) {
@@ -145,6 +178,24 @@ export function AccountPage() {
           })}
         </div>
 
+        <section className="mt-4 rounded-3xl border border-border bg-card p-6" aria-labelledby="top-up-heading">
+          <h2 id="top-up-heading" className="text-sm font-semibold tracking-[0.16em] text-muted-foreground">
+            TOP UP
+          </h2>
+          <div className="mt-4 flex items-center gap-4 rounded-2xl border border-border p-4">
+            <UsdtMark />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">USDT</p>
+              <p className="text-sm text-muted-foreground">Confirmation: {DEPOSIT_RULES.confirmationTime}</p>
+              <p className="text-sm text-muted-foreground">Fee: {DEPOSIT_RULES.feeBps / 100}%</p>
+            </div>
+            <Button size="sm" onClick={() => setTopUp(true)} disabled={!deposits} aria-label="Select USDT top-up">
+              Select
+            </Button>
+          </div>
+          <DepositHistory overview={deposits} />
+        </section>
+
         <section className="mt-4 rounded-3xl border border-border bg-card p-6">
           <h2 className="text-sm font-semibold tracking-[0.16em] text-muted-foreground">MATCH HISTORY</h2>
           <MatchHistory matches={matches} />
@@ -154,6 +205,40 @@ export function AccountPage() {
           Log out
         </Button>
       </main>
+
+      {topUpOpen && deposits ? (
+        <TopUpDialog
+          overview={deposits}
+          onClose={() => setTopUp(false)}
+          onChanged={async () => {
+            await Promise.all([loadDeposits(), refreshSession()]);
+          }}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function DepositHistory({ overview }: { overview: DepositOverview | null }) {
+  if (!overview || overview.deposits.length === 0) {
+    return <p className="mt-4 text-sm text-muted-foreground">No deposits yet.</p>;
+  }
+
+  return (
+    <ul className="mt-4 divide-y divide-border" aria-label="Deposits">
+      {overview.deposits.map((deposit) => (
+        <li key={deposit.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+          <span className="text-sm font-semibold">Deposit</span>
+          <span className="text-xs text-muted-foreground">{NETWORK_INFO[deposit.network].label}</span>
+          <span className="ml-auto text-sm font-semibold text-gold">
+            {formatAmount("usdt", deposit.credited, { sign: true })}
+          </span>
+          <span className="w-full break-all text-xs text-muted-foreground">
+            {new Date(deposit.createdAt).toLocaleString()} · {formatAmount("usdt", deposit.amount)} received,{" "}
+            {formatAmount("usdt", deposit.fee)} fee · {deposit.txId}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }

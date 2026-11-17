@@ -29,6 +29,11 @@ export const errorCodeSchema = z.enum([
   "already_moved",
   "match_not_live",
   "queue_unavailable",
+  "deposit_closed",
+  "deposit_pending",
+  "deposit_rejected",
+  "already_claimed",
+  "wallet_taken",
 ]);
 export type ErrorCode = z.infer<typeof errorCodeSchema>;
 

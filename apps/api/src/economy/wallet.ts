@@ -21,6 +21,8 @@ export const ledgerKind = {
   houseCut: "house_cut",
   /** A correction made by hand with `pnpm balance`, never by the app. */
   adjustment: "adjustment",
+  /** An on-chain USDT deposit, after the 1% fee. */
+  deposit: "deposit",
 } as const;
 
 export type LedgerKind = (typeof ledgerKind)[keyof typeof ledgerKind];
@@ -295,6 +297,38 @@ export function adjustBalance(
     const wallet = readWallet(db, userId, currency);
     return wallet ? ({ ok: true, wallet } as const) : ({ ok: false, reason: "no_wallet" } as const);
   });
+}
+
+/**
+ * Adds a verified deposit to the USDT balance: `credited` to the player, the
+ * fee to the house. **Call inside the transaction that inserts the deposit
+ * row**, so the money and the record commit or roll back together.
+ */
+export function creditDeposit(
+  db: AppDatabase,
+  params: { userId: string; depositId: string; credited: number; fee: number; now: string },
+) {
+  const updated = db
+    .prepare("UPDATE wallets SET available = available + ? WHERE user_id = ? AND currency = 'usdt'")
+    .run(params.credited, params.userId);
+  if (Number(updated.changes) !== 1) {
+    throw new Error(`cannot credit deposit ${params.depositId}: ${params.userId} has no USDT wallet`);
+  }
+
+  writeLedger(db, {
+    userId: params.userId,
+    currency: "usdt",
+    kind: ledgerKind.deposit,
+    amount: params.credited,
+    matchId: null,
+    createdAt: params.now,
+  });
+
+  if (params.fee > 0) {
+    db.prepare(
+      "INSERT INTO house_ledger (id, currency, kind, amount, match_id, created_at) VALUES (?, 'usdt', 'deposit_fee', ?, NULL, ?)",
+    ).run(randomUUID(), params.fee, params.now);
+  }
 }
 
 /** Everything the house has earned in one currency, in smallest units. */

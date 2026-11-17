@@ -143,3 +143,24 @@ export {
   type ServerToClientEvents,
   type SocketData,
 } from "./socket";
+
+export {
+  DEPOSIT_RULES,
+  NETWORK_INFO,
+  depositClaimResponseSchema,
+  depositClaimSchema,
+  depositFee,
+  depositNetworkSchema,
+  depositNetworks,
+  depositOverviewSchema,
+  depositRecordSchema,
+  isNetworkAddress,
+  normalizeTxId,
+  saveDepositWalletSchema,
+  type DepositClaim,
+  type DepositClaimResponse,
+  type DepositNetwork,
+  type DepositOverview,
+  type DepositRecord,
+  type SaveDepositWallet,
+} from "./deposit";

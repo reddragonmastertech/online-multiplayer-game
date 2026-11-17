@@ -109,6 +109,37 @@ export const migrations: readonly Migration[] = [
       )`,
     ],
   },
+  {
+    // USDT deposits. `deposit_wallets` is the wallet each player pays from;
+    // an address belongs to one account only. `deposits` holds every credited
+    // transaction, and UNIQUE (network, tx_id) is what makes a double credit
+    // impossible, even if two claims race.
+    version: 3,
+    name: "usdt deposits",
+    statements: [
+      `CREATE TABLE deposit_wallets (
+        user_id TEXT NOT NULL REFERENCES users (id),
+        network TEXT NOT NULL,
+        address TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (user_id, network)
+      )`,
+      `CREATE UNIQUE INDEX deposit_wallets_address_unique ON deposit_wallets (network, address)`,
+      `CREATE TABLE deposits (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users (id),
+        network TEXT NOT NULL,
+        tx_id TEXT NOT NULL,
+        from_address TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        fee INTEGER NOT NULL,
+        credited INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE UNIQUE INDEX deposits_tx_unique ON deposits (network, tx_id)`,
+      `CREATE INDEX deposits_user ON deposits (user_id, created_at)`,
+    ],
+  },
 ];
 
 export function schemaVersion(client: SqliteClient) {
