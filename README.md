@@ -134,6 +134,7 @@ from button press to payout.
 |---|---|
 | [`docs/Project_Structure.md`](docs/Project_Structure.md) | Every folder and file, written for someone new |
 | [`docs/Development_Steps.md`](docs/Development_Steps.md) | What was built, in order, and why |
+| [`docs/Roadmap.md`](docs/Roadmap.md) | What is left to do, in order, with done-when checks |
 | [`docs/PvP_Arena_UI_Architecture_UX_Flow.md`](docs/PvP_Arena_UI_Architecture_UX_Flow.md) | The product and UX specification |
 | [`deploy/README.md`](deploy/README.md) | Hosting runbook |
 

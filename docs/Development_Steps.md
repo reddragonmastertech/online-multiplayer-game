@@ -229,7 +229,8 @@ the match code or the socket contracts.
 
 ## Suggested next work
 
-Nothing here is required. In rough order of value:
+The detailed, ordered plan is [`Roadmap.md`](Roadmap.md). In short, in rough
+order of value:
 
 1. **Publish it** and run the two-device test. Everything else is guesswork
    until real people have played.
