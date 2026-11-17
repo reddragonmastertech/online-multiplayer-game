@@ -30,9 +30,10 @@ test("join now asks guests to log in", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
 });
 
-test("other sections stay blank", async ({ page }) => {
-  await page.goto("/play");
-
-  await expect(page.getByRole("heading", { name: "Play" })).toBeVisible();
-  await expect(page.getByText("Nothing here yet.")).toBeVisible();
+test("retired and unknown paths go to the intro page", async ({ page }) => {
+  for (const path of ["/play", "/missions", "/ranking", "/wallet", "/no-such-page"]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { name: /Your arena/i })).toBeVisible();
+  }
 });
