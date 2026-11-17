@@ -126,6 +126,10 @@ pass.
 
 ### 3.3 Line up the game catalog with the game packages
 
+**Skipped by decision:** no new games for now. The catalog and the stub
+packages stay as they are, and the mismatch stays in the build log's rough
+edges.
+
 The catalog offers **chess and 4×4**. The packages are **chess, checkers and
 tic-tac-toe**. No 4×4 package exists, and nobody has said what 4×4 is (UX spec
 §15, question 10).
@@ -149,16 +153,19 @@ In rough order of value. Re-rank these after phase 2.
 Specified in UX spec §5.5. It is listed there as an agreed requirement, not an
 option.
 
-- [ ] Contracts first: `chat:send` / `chat:message` in
-      `packages/shared/src/socket.ts`.
-- [ ] Server: players only. Spectators are refused on the server, not hidden in
-      the UI. Rate-limited per user, with a length cap. In memory with the
-      match; persistence is a policy decision (spec §15, question 6).
-- [ ] Web: a collapsible panel in `match-shell.tsx`, plus quick reactions for
+- [x] Contracts first: `chat:send` / `chat:message` (plus `chat:history` for a
+      reload) in `packages/shared/src/socket.ts`, rules in `chat.ts`.
+- [x] Server: players only. Spectators are refused on the server, not hidden in
+      the UI. Rate-limited per user (5 per 10s), capped at 200 characters. In
+      memory with the match and dropped when it ends; nothing is stored.
+- [x] Web: a collapsible panel in `match-shell.tsx`, plus quick reactions for
       RPS. On mobile it sits **below** the hand buttons.
-- [ ] Mute per opponent, so a player can silence the other side.
-- [ ] Tests: a spectator cannot send or receive; play still works when chat is
-      off.
+- [x] Mute per opponent, so a player can silence the other side. Local only.
+- [x] Tests: a spectator cannot send or receive (`gateway.test.ts` with real
+      sockets, `e2e/chat.spec.ts`); every other match test plays without
+      touching chat.
+- [ ] Not done: reporting a message. There is no moderation backend to send a
+      report to.
 
 **Done when** the spec §13 match-room checks for chat pass.
 

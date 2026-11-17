@@ -220,6 +220,27 @@ harder once strangers have accounts:
   settings. An old `.env` that still sets them keeps working; the config
   ignores keys it does not know.
 
+### Roadmap phase 4 — match chat
+
+The two seated players can talk during a match; nobody else can.
+
+- **Spectators are kept out by the server, not the UI.** They share the match
+  room so they get reveals and results, which means chat cannot be a room
+  broadcast. The gateway checks the sender is seated and emits each message to
+  the two players' own sockets.
+- **It lives and dies with the match.** `match/chat.ts` holds messages in
+  memory, up to 50 per match; a reload gets them back through `chat:history`.
+  When the match ends the chat is dropped. Nothing touches the database, so
+  there is no retention question yet.
+- **Abuse limits are small and local:** 200 characters, 5 messages per 10
+  seconds per player, and a mute that hides the opponent on your own device.
+  There is no reporting, because there is nowhere to send a report.
+- **Quick reactions** (`👍`, `GG`, …) are ordinary messages sent in one tap,
+  so nobody has to type during a ten-second round.
+- **The first API tests with real sockets** (`match/gateway.test.ts`), because
+  "a spectator who sends anyway is refused" is a gateway rule that unit tests
+  of the chat module cannot reach.
+
 ---
 
 ## Deliberately not built
@@ -233,7 +254,7 @@ harder once strangers have accounts:
 | USDT, payments | Out of scope. RAC is play-only credit |
 | A second API instance | Would split the queue |
 | Email verification, password reset | Testers use email + password |
-| Match chat | Specified in the UX doc, not started |
+| Chat reporting and moderation | Mute exists; there is nowhere to send a report |
 | Leaderboards | Route exists with an honest empty state |
 | The six-tab account area | Overview only, until there is more to show |
 | Chess, 4×4 | Catalog entries marked `Coming soon` |
@@ -265,8 +286,10 @@ order of value:
 
 1. **Publish it** and run the two-device test. Everything else is guesswork
    until real people have played.
-2. **Match chat** — specified in §5.5 of the UX doc, scoped to the two players.
-3. **A second game.** The structure is ready; it is the real test of whether
-   the match shell is as game-agnostic as intended.
+2. **A second game.** The structure is ready; it is the real test of whether
+   the match shell is as game-agnostic as intended. Deferred for now by
+   decision.
+3. **The account area** beyond the overview: profile, settings, the ledger as
+   a wallet page.
 4. **Leaderboards**, once there are enough matches for a ranking to mean
    anything.

@@ -59,6 +59,7 @@ TypeScript type from the same definition.
 | `src/economy.ts` | `Wallet`, and `MATCH_RULES`: the frozen numbers |
 | `src/match.ts` | Match state, rounds, history, the live-match summary |
 | `src/socket.ts` | Every socket event name and payload |
+| `src/chat.ts` | Match chat messages, `CHAT_RULES` limits, quick reactions |
 | `src/index.ts` | Re-exports everything; this is what others import |
 
 **Start here when adding a feature.** Define the shape first, then the server
@@ -199,6 +200,7 @@ Two invariants it exists to protect:
 | `gateway.ts` | Translates socket events into queue and runtime calls |
 | `store.ts` | Writes match rows; releases matches a dead process left behind |
 | `history.ts` | Reads finished matches back for `/account` |
+| `chat.ts` | Match chat in memory: validation, rate limit, recent history |
 
 **`queue.ts`** holds at most one ticket per user. That is what stops you
 pairing with yourself across two tabs.
@@ -217,6 +219,10 @@ here, not by hiding something in the UI.
 **`gateway.ts`** is where cheating gets refused. A move from someone who is not
 seated, a second move in one round, a move after the match ended — all rejected
 with an error code, and nothing changes.
+
+It is also what keeps chat private. Spectators join the match room to get
+reveals and results, so a chat message is **not** a room broadcast: the gateway
+checks the sender is seated, then emits to the two players' own sockets.
 
 ### `http/web.ts`
 
@@ -256,7 +262,7 @@ change them; any component can read one without prop-drilling.
 |---|---|
 | `session-store` | Who is logged in, their wallet, the token |
 | `queue-store` | Are we searching for a match, and did we find one |
-| `match-store` | The live match: state, round log, result |
+| `match-store` | The live match: state, round log, result, chat |
 | `ui-store` | Is the auth dialog open |
 
 Both `queue-store` and `match-store` attach listeners to the **same** socket
@@ -301,6 +307,8 @@ server's `viewerRole`, never from a local guess.
 - `game-surface.tsx` — picks a board from `gameId`.
 - `rps-board.tsx` — the three hand buttons. **The RPS-specific part.**
 - `player-seat.tsx`, `round-log.tsx`, `match-closed.tsx` — shared pieces.
+- `match-chat.tsx` — the players-only chat panel. The shell takes it as an
+  optional `chat` slot below the board; the spectator view passes none.
 - `portrait.tsx` — stock art for the **CPU** opponent only. Real players get
   initials, never a photograph.
 
@@ -372,6 +380,8 @@ Notice what the browser never does: judge a round, change a score, or move RAC.
 | `apps/api/src/db/migrate.test.ts` | Fresh, legacy and newer databases; rollback on failure | `pnpm test` |
 | `apps/api/src/economy/wallet.test.ts` | Locking, refunds, ledger | `pnpm test` |
 | `apps/api/src/match/queue.test.ts` | Pairing, no self-pairing | `pnpm test` |
+| `apps/api/src/match/chat.test.ts` | Chat length, rate limit, history | `pnpm test` |
+| `apps/api/src/match/gateway.test.ts` | Real sockets: chat reaches players, never spectators | `pnpm test` |
 | `apps/api/src/match/runtime.test.ts` | Clock, hidden hands, settling | `pnpm test` |
 | `apps/api/src/server.test.ts` | Startup, shutdown, rate limits | `pnpm test` |
 | `apps/api/src/http/web.test.ts` | Which URLs are the app vs the API | `pnpm test` |

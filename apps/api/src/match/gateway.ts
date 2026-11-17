@@ -1,4 +1,5 @@
 import {
+  chatSendSchema,
   clientEvent,
   MATCH_RULES,
   matchForfeitSchema,
@@ -15,6 +16,7 @@ import {
 import type { Server, Socket } from "socket.io";
 import type { AppDatabase } from "../db/client";
 import { lockRacStake, refundRacStake } from "../economy/wallet";
+import { createMatchChat } from "./chat";
 import { createMatchQueue, type QueueTicket } from "./queue";
 import { createMatchRuntime, stateFor } from "./runtime";
 import { createQueuedMatch, matchRoom, spectatorRoom, toMatchSummary } from "./store";
@@ -45,6 +47,7 @@ export function registerMatchGateway(
 ) {
   const { db, log } = deps;
   const queue = createMatchQueue();
+  const chat = createMatchChat();
 
   /** Every socket the user has open, so a second tab stays in sync. */
   function socketsForUser(userId: string) {
@@ -68,12 +71,19 @@ export function registerMatchGateway(
       },
       over: (matchId, payload) => {
         io.to(matchRoom(matchId)).emit(serverEvent.matchOver, payload);
+        // Chat lasts as long as the match and is never stored.
+        chat.close(matchId);
       },
     },
   });
 
   function fail(socket: ArenaSocket, code: ErrorCode, message: string) {
     socket.emit(serverEvent.error, { code, message });
+  }
+
+  /** Recent chat for a player who has just (re)joined their match. */
+  function sendChatHistory(socket: ArenaSocket, matchId: string) {
+    socket.emit(serverEvent.chatHistory, { matchId, messages: chat.history(matchId) });
   }
 
   function releaseTicket(ticket: QueueTicket, reason: string) {
@@ -219,6 +229,7 @@ export function registerMatchGateway(
           serverEvent.matchState,
           stateFor(match, socket.data.userId, Date.now()),
         );
+        sendChatHistory(socket, match.matchId);
       }
     }
 
@@ -285,6 +296,7 @@ export function registerMatchGateway(
         // A player asking to watch their own match is just rejoining it.
         void socket.join(matchRoom(match.matchId));
         socket.emit(serverEvent.matchState, stateFor(match, socket.data.userId, Date.now()));
+        sendChatHistory(socket, match.matchId);
         return;
       }
 
@@ -293,6 +305,61 @@ export function registerMatchGateway(
       void socket.join(matchRoom(match.matchId));
       void socket.join(spectatorRoom(match.matchId));
       socket.emit(serverEvent.matchState, stateFor(match, null, Date.now()));
+    });
+
+    socket.on(clientEvent.chatSend, (payload) => {
+      if (!socket.data.userId) {
+        fail(socket, "unauthorized", "Log in to chat.");
+        return;
+      }
+
+      const parsed = chatSendSchema.safeParse(payload);
+      if (!parsed.success) {
+        fail(socket, "invalid_input", "That message is empty or too long.");
+        return;
+      }
+
+      const match = runtime.get(parsed.data.matchId);
+      if (!match) {
+        fail(socket, "match_not_found", "Chat closes when the match ends.");
+        return;
+      }
+
+      // Seated players only. Spectators share the match room for reveals, so
+      // this check is what keeps them out of the chat, not the UI.
+      const seat =
+        match.players.a.userId === socket.data.userId
+          ? ("a" as const)
+          : match.players.b.userId === socket.data.userId
+            ? ("b" as const)
+            : null;
+      if (!seat) {
+        fail(socket, "not_your_match", "Only the two players can chat in a match.");
+        return;
+      }
+
+      const result = chat.post(
+        match.matchId,
+        { userId: socket.data.userId, name: match.players[seat].name, seat },
+        parsed.data.text,
+      );
+      if (!result.ok) {
+        fail(
+          socket,
+          result.reason === "rate_limited" ? "rate_limited" : "invalid_input",
+          result.reason === "rate_limited"
+            ? "Slow down a little before sending more."
+            : "That message is empty or too long.",
+        );
+        return;
+      }
+
+      // Every open socket of both players, and nobody else.
+      for (const userId of [match.players.a.userId, match.players.b.userId]) {
+        for (const open of socketsForUser(userId)) {
+          open.emit(serverEvent.chatMessage, result.message);
+        }
+      }
     });
 
     socket.on(clientEvent.matchUnwatch, (payload) => {

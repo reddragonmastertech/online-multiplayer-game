@@ -1,4 +1,15 @@
 export {
+  CHAT_RULES,
+  chatHistorySchema,
+  chatMessageSchema,
+  chatSendSchema,
+  quickReactions,
+  type ChatHistory,
+  type ChatMessage,
+  type ChatSend,
+} from "./chat";
+
+export {
   apiErrorSchema,
   errorCodeSchema,
   idSchema,

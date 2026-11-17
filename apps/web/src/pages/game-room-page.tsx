@@ -8,6 +8,7 @@ import {
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { GameSurface } from "@/components/match/game-surface";
+import { MatchChat } from "@/components/match/match-chat";
 import { MatchClosed } from "@/components/match/match-closed";
 import { MatchShell } from "@/components/match/match-shell";
 import type { MatchMoveView, MatchSeatView, MatchView } from "@/components/match/match-types";
@@ -135,6 +136,10 @@ export function GameRoomPage() {
   const move = useMatchStore((store) => store.move);
   const forfeit = useMatchStore((store) => store.forfeit);
   const clear = useMatchStore((store) => store.clear);
+  const chat = useMatchStore((store) => store.chat);
+  const chatMuted = useMatchStore((store) => store.chatMuted);
+  const sendChat = useMatchStore((store) => store.sendChat);
+  const toggleChatMute = useMatchStore((store) => store.toggleChatMute);
 
   const [confirmingExit, setConfirmingExit] = useState(false);
 
@@ -231,6 +236,17 @@ export function GameRoomPage() {
             selected={selected}
             disabled={!choosing || Boolean(pending)}
             onPick={move}
+          />
+        }
+        chat={
+          <MatchChat
+            messages={chat}
+            yourSeat={you.seat}
+            opponentName={opponent.name}
+            muted={chatMuted}
+            closed={finished}
+            onSend={sendChat}
+            onToggleMute={toggleChatMute}
           />
         }
       />

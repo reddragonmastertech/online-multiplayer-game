@@ -163,5 +163,5 @@ from button press to payout.
 - **No email verification, password reset, or moderation tools.**
 - **Not multi-instance.** See the hosting note above.
 - Chess and 4×4 appear in the catalog as `Coming soon` and are not playable.
-- Spectating works; match chat, leaderboards and the full account area are
-  specified in the UX document but not built.
+- Spectating and players-only match chat work. Leaderboards and the full
+  account area are specified in the UX document but not built.

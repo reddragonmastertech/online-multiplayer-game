@@ -1,6 +1,7 @@
 import {
   clientEvent,
   serverEvent,
+  type ChatMessage,
   type MatchOver,
   type MatchReveal,
   type MatchState,
@@ -23,11 +24,33 @@ type MatchStoreState = {
   /** The hand this client sent, shown as selected until the server confirms. */
   pending: RpsHand | null;
   error: string | null;
+  /** Players only; the server never sends chat to a spectator. */
+  chat: ChatMessage[];
+  /** Hides the opponent's messages on this device. Not sent anywhere. */
+  chatMuted: boolean;
   watch: (matchId: string) => void;
   move: (hand: RpsHand) => void;
   forfeit: () => void;
+  sendChat: (text: string) => void;
+  toggleChatMute: () => void;
   clear: () => void;
 };
+
+const emptyMatch = {
+  matchId: null,
+  state: null,
+  over: null,
+  log: [],
+  pending: null,
+  error: null,
+  chat: [],
+  chatMuted: false,
+} satisfies Partial<MatchStoreState>;
+
+function appendChat(chat: ChatMessage[], message: ChatMessage): ChatMessage[] {
+  if (chat.some((existing) => existing.id === message.id)) return chat;
+  return [...chat, message];
+}
 
 let bound: ArenaSocket | null = null;
 
@@ -77,6 +100,22 @@ function bindSocket(socket: ArenaSocket): ArenaSocket {
     void useSessionStore.getState().refresh();
   });
 
+  socket.on(serverEvent.chatMessage, (payload) => {
+    useMatchStore.setState((current) => {
+      if (payload.matchId !== current.matchId) return current;
+      return { chat: appendChat(current.chat, payload) };
+    });
+  });
+
+  socket.on(serverEvent.chatHistory, (payload) => {
+    useMatchStore.setState((current) => {
+      if (payload.matchId !== current.matchId) return current;
+      // The server's history, plus anything that arrived live while it was in
+      // flight. appendChat skips duplicates by id.
+      return { chat: current.chat.reduce(appendChat, payload.messages) };
+    });
+  });
+
   socket.on(serverEvent.error, (payload) => {
     useMatchStore.setState({ error: payload.message, pending: null });
   });
@@ -93,17 +132,12 @@ function socketOrNull() {
 }
 
 export const useMatchStore = create<MatchStoreState>((set, get) => ({
-  matchId: null,
-  state: null,
-  over: null,
-  log: [],
-  pending: null,
-  error: null,
+  ...emptyMatch,
 
   watch: (matchId) => {
     const socket = socketOrNull();
     if (get().matchId !== matchId) {
-      set({ matchId, state: null, over: null, log: [], pending: null, error: null });
+      set({ ...emptyMatch, matchId });
     }
 
     // Players are re-seated automatically on connection; this also subscribes
@@ -130,11 +164,21 @@ export const useMatchStore = create<MatchStoreState>((set, get) => ({
     socket.emit(clientEvent.matchForfeit, { matchId });
   },
 
+  sendChat: (text) => {
+    const { matchId, state, over } = get();
+    const trimmed = text.trim();
+    if (!matchId || over || state?.viewerRole !== "player" || !trimmed) return;
+
+    socketOrNull().emit(clientEvent.chatSend, { matchId, text: trimmed });
+  },
+
+  toggleChatMute: () => set((current) => ({ chatMuted: !current.chatMuted })),
+
   clear: () => {
     const { matchId } = get();
     if (matchId) {
       bound?.emit(clientEvent.matchUnwatch, { matchId });
     }
-    set({ matchId: null, state: null, over: null, log: [], pending: null, error: null });
+    set(emptyMatch);
   },
 }));

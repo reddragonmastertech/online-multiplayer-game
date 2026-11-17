@@ -8,10 +8,13 @@ import type { MatchView } from "./match-types";
 export function MatchShell({
   view,
   board,
+  chat,
   onPlayAgain,
 }: {
   view: MatchView;
   board: ReactNode;
+  /** Players-only chat. Sits below the board so it never pushes the controls down on mobile. */
+  chat?: ReactNode;
   onPlayAgain?: () => void;
 }) {
   const showTimer = Boolean(view.showCountdown && view.secondsLeft !== undefined);
@@ -96,6 +99,8 @@ export function MatchShell({
             <PlayerSeat seat={view.right} />
           </div>
         </div>
+
+        {chat}
 
         <RoundLog entries={view.log} />
       </div>

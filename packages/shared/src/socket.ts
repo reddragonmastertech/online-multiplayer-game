@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ChatHistory, ChatMessage, ChatSend } from "./chat";
 import { matchIdSchema, type ProtocolError } from "./common";
 import {
   matchSummarySchema,
@@ -18,6 +19,8 @@ export const clientEvent = {
   /** Read-only: subscribes a non-player to a public match's visible state. */
   matchWatch: "match:watch",
   matchUnwatch: "match:unwatch",
+  /** Players only. Refused for spectators. */
+  chatSend: "chat:send",
 } as const;
 
 export const serverEvent = {
@@ -26,6 +29,10 @@ export const serverEvent = {
   matchState: "match:state",
   matchReveal: "match:reveal",
   matchOver: "match:over",
+  /** Sent to the two players only, never to spectators. */
+  chatMessage: "chat:message",
+  /** Recent messages, sent to a player who (re)joins a live match. */
+  chatHistory: "chat:history",
   error: "protocol:error",
 } as const;
 
@@ -70,6 +77,7 @@ export type ClientToServerEvents = {
   [clientEvent.matchForfeit]: (payload: MatchForfeit) => void;
   [clientEvent.matchWatch]: (payload: MatchWatch) => void;
   [clientEvent.matchUnwatch]: (payload: MatchWatch) => void;
+  [clientEvent.chatSend]: (payload: ChatSend) => void;
 };
 
 export type ServerToClientEvents = {
@@ -78,6 +86,8 @@ export type ServerToClientEvents = {
   [serverEvent.matchState]: (payload: MatchState) => void;
   [serverEvent.matchReveal]: (payload: MatchReveal) => void;
   [serverEvent.matchOver]: (payload: MatchOver) => void;
+  [serverEvent.chatMessage]: (payload: ChatMessage) => void;
+  [serverEvent.chatHistory]: (payload: ChatHistory) => void;
   [serverEvent.error]: (payload: ProtocolError) => void;
 };
 
