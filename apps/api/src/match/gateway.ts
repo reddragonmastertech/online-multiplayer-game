@@ -410,6 +410,16 @@ export function registerMatchGateway(
         releaseTicket(existing, "reconnect");
       }
 
+      if (entry.currency === "usdt") {
+        const frozen = db.prepare("SELECT usdt_frozen FROM users WHERE id = ?").get(socket.data.userId) as
+          | { usdt_frozen: number }
+          | undefined;
+        if (frozen?.usdt_frozen === 1) {
+          fail(socket, "forbidden", "Your USDT is frozen. Contact support.");
+          return;
+        }
+      }
+
       const lock = lockStake(db, { userId: socket.data.userId, currency: entry.currency, stake: entry.stake });
       if (!lock.ok) {
         fail(
@@ -454,5 +464,18 @@ export function registerMatchGateway(
     });
   });
 
-  return { queue, runtime };
+  /** Distinct logged-in users with a socket open right now. */
+  function onlineCount() {
+    return new Set([...io.sockets.sockets.values()].map((socket) => socket.data.userId).filter(Boolean)).size;
+  }
+
+  /**
+   * Closes every socket of a user, for a suspension or "log out everywhere".
+   * A player in a live match gets the usual disconnect grace, then forfeits.
+   */
+  function disconnectUser(userId: string) {
+    for (const socket of socketsForUser(userId)) socket.disconnect(true);
+  }
+
+  return { queue, runtime, onlineCount, disconnectUser };
 }

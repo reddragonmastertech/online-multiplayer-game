@@ -36,6 +36,8 @@ export const errorCodeSchema = z.enum([
   "wallet_taken",
   "forbidden",
   "withdrawal_pending",
+  "two_factor_required",
+  "account_suspended",
 ]);
 export type ErrorCode = z.infer<typeof errorCodeSchema>;
 

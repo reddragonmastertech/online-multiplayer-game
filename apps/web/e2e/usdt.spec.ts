@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { expect, test, type Page } from "@playwright/test";
+import { enterAdmin, makeAdmin } from "./admin-helpers";
 
 /**
  * The paid version (Roadmap 4.2, part A): USDT rooms next to the free RAC
@@ -242,16 +243,6 @@ test("a USDT deposit is checked on the chain and credited minus 1%", async ({ pa
   await expect(page.getByRole("button", { name: "JOIN NOW" })).toBeEnabled();
 });
 
-/** Gives an account admin rights, the way `pnpm admin` does. */
-function makeAdmin(name: string) {
-  const db = new DatabaseSync(e2eDatabase);
-  try {
-    db.prepare("UPDATE users SET is_admin = 1 WHERE name = ?").run(name);
-  } finally {
-    db.close();
-  }
-}
-
 test("a withdrawal is locked, then paid or rejected by an admin", async ({ browser }) => {
   const stamp = Date.now();
   const playerName = `Wes${stamp}`;
@@ -290,9 +281,9 @@ test("a withdrawal is locked, then paid or rejected by an admin", async ({ brows
   await expect(player.getByRole("link", { name: new RegExp(`${playerName}.*10 USDT`) })).toBeVisible();
   await expect(player.getByText("Available 10 USDT · Locked 15 USDT")).toBeVisible();
 
-  // The admin sees exactly what to send, sends it, and marks it paid.
-  await admin.reload();
-  await admin.getByRole("link", { name: "Admin" }).click();
+  // The admin passes two-factor, sees exactly what to send, sends it, and marks it paid.
+  await enterAdmin(admin);
+  await admin.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: "Withdrawals" }).click();
   const row = admin.getByRole("listitem", { name: `Withdrawal for ${playerName}` });
   await expect(row).toContainText("Send exactly 14.85 USDT on Tron (TRC20) to:");
   await expect(row).toContainText(wallet);
@@ -324,6 +315,7 @@ test("a withdrawal is locked, then paid or rejected by an admin", async ({ brows
   // A player cannot open the admin page.
   await player.goto("/admin");
   await expect(player.getByText("This page is for admins only.")).toBeVisible();
+  await expect(player.getByRole("navigation", { name: "Admin" })).toHaveCount(0);
 
   await playerCtx.close();
   await adminCtx.close();

@@ -72,6 +72,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   logout: () => {
     setStoredToken(null);
     closeSocket();
+    // An admin session never outlives the login it came from.
+    try {
+      window.sessionStorage.removeItem("arena.adminSession");
+    } catch {
+      // Storage blocked; nothing was stored.
+    }
     set({ status: "ready", token: null, user: null, wallets: [] });
   },
 }));

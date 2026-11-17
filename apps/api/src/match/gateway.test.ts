@@ -142,6 +142,10 @@ describe("match chat over real sockets", () => {
     const matchId = seatTwoPlayers(server);
 
     const ann = await client(server.url, "ann");
+    // A real account that is simply not in this match.
+    server.db
+      .prepare("INSERT INTO users (id, name, email, password_hash, created_at) VALUES ('carl', 'Player carl', 'carl@example.test', 'x', 'now')")
+      .run();
     const outsider = await client(server.url, "carl");
     const annChat = collect<ChatMessage>(ann, serverEvent.chatMessage);
 
@@ -237,5 +241,22 @@ describe("queue stakes over real sockets", () => {
       { currency: "rac", available: 100, locked: 0 },
       { currency: "usdt", available: 500_000, locked: 500_000 },
     ]);
+  });
+});
+
+describe("socket sign-in", () => {
+  it("refuses a suspended account or an ended session", async () => {
+    const server = await startServer();
+    server.db
+      .prepare("INSERT INTO users (id, name, email, password_hash, created_at) VALUES ('dan', 'Player dan', 'dan@example.test', 'x', 'now')")
+      .run();
+    // A fresh token works.
+    await client(server.url, "dan");
+
+    server.db.prepare("UPDATE users SET status = 'suspended' WHERE id = 'dan'").run();
+    await expect(client(server.url, "dan")).rejects.toThrow("unauthorized");
+
+    server.db.prepare("UPDATE users SET status = 'active', token_version = 1 WHERE id = 'dan'").run();
+    await expect(client(server.url, "dan")).rejects.toThrow("unauthorized");
   });
 });

@@ -11,8 +11,8 @@ export const userSchema = z.object({
   name: displayNameSchema,
   email: emailSchema,
   createdAt: isoDateSchema,
-  /** Set from the command line only (`pnpm admin`), never through the API. */
-  isAdmin: z.boolean().optional(),
+  /** Present for admins only. Set by the owner or `pnpm admin`, never by the player. */
+  role: z.enum(["owner", "finance", "moderator", "support"]).optional(),
 });
 export type User = z.infer<typeof userSchema>;
 
@@ -61,4 +61,14 @@ export const apiPaths = {
   adminWithdrawals: "/api/admin/withdrawals",
   /** POST `{ action: "paid", txId }` or `{ action: "reject", reason }`. */
   adminWithdrawalDecision: "/api/admin/withdrawals/:id",
+  adminGate: "/api/admin/gate",
+  admin2faSetup: "/api/admin/2fa/setup",
+  admin2faEnable: "/api/admin/2fa/enable",
+  adminSession: "/api/admin/session",
+  adminDashboard: "/api/admin/dashboard",
+  adminPlayers: "/api/admin/players",
+  adminPlayer: "/api/admin/players/:id",
+  adminPlayerAction: "/api/admin/players/:id/:action",
+  adminAudit: "/api/admin/audit",
+  adminAdmins: "/api/admin/admins",
 } as const;

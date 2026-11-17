@@ -57,7 +57,7 @@ Builds the site and serves everything — pages, API and websockets — from
 | `pnpm test` | Unit tests (engine, queue, wallet, server) |
 | `pnpm build` | Build everything |
 | `pnpm --filter @game-platform/api balance -- "<name>" [rac\|usdt <amount>]` | Show a player's balances, or correct one by hand (writes an `adjustment` ledger row) |
-| `pnpm --filter @game-platform/api admin -- "<name>" on` | Make a player an admin (`off` to undo; no name lists them). Admins handle withdrawals at `/admin` |
+| `pnpm --filter @game-platform/api admin -- "<name>" owner` | Give a role (`owner`, `finance`, `moderator`, `support`, or `off`; no name lists them). Use it for the first owner; after that the owner manages admins at `/admin/admins` |
 
 From `apps/web`:
 

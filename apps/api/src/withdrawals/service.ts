@@ -14,6 +14,7 @@ import {
 import type { AppDatabase } from "../db/client";
 import { withTransaction } from "../db/client";
 import { completeWithdrawal, lockWithdrawal, returnWithdrawal } from "../economy/wallet";
+import { recordAudit } from "../admin/audit";
 import { HttpError, invalidInput, notFound } from "../http/errors";
 
 type WithdrawalRow = {
@@ -51,13 +52,6 @@ function toRecord(row: WithdrawalRow): WithdrawalRecord {
   };
 }
 
-export const forbidden = () => new HttpError(403, "forbidden", "Only an admin can do that.");
-
-export function isAdmin(db: AppDatabase, userId: string) {
-  const row = db.prepare("SELECT is_admin FROM users WHERE id = ?").get(userId) as { is_admin: number } | undefined;
-  return row?.is_admin === 1;
-}
-
 export function createWithdrawalService(deps: { db: AppDatabase; now?: () => string }) {
   const { db } = deps;
   const now = deps.now ?? (() => new Date().toISOString());
@@ -76,6 +70,10 @@ export function createWithdrawalService(deps: { db: AppDatabase; now?: () => str
    */
   function request(userId: string, network: DepositNetwork, amount: number): WithdrawalRecord {
     const label = NETWORK_INFO[network].label;
+    const frozen = db.prepare("SELECT usdt_frozen FROM users WHERE id = ?").get(userId) as { usdt_frozen: number } | undefined;
+    if (frozen?.usdt_frozen === 1) {
+      throw new HttpError(403, "forbidden", "Your USDT is frozen. Contact support.");
+    }
     if (!Number.isSafeInteger(amount) || amount < WITHDRAWAL_RULES.minimum) {
       throw invalidInput(`The minimum withdrawal is ${formatAmount("usdt", WITHDRAWAL_RULES.minimum)}.`);
     }
@@ -134,8 +132,8 @@ export function createWithdrawalService(deps: { db: AppDatabase; now?: () => str
   }
 
   /** Every pending request first, oldest first, then the latest decided ones. */
-  function adminList(adminId: string): AdminWithdrawal[] {
-    if (!isAdmin(db, adminId)) throw forbidden();
+  /** For admins; the route checks the permission. */
+  function adminList(): AdminWithdrawal[] {
     const rows = db
       .prepare(
         `SELECT ${COLUMNS}, u.name AS user_name, a.name AS admin_name
@@ -156,8 +154,12 @@ export function createWithdrawalService(deps: { db: AppDatabase; now?: () => str
    * rejects it. Only a pending request can be decided, and only once: the
    * status check is part of the UPDATE, so two admins cannot both decide it.
    */
-  function decide(adminId: string, withdrawalId: string, decision: WithdrawalDecision): WithdrawalRecord {
-    if (!isAdmin(db, adminId)) throw forbidden();
+  function decide(
+    admin: { userId: string; ip?: string | null },
+    withdrawalId: string,
+    decision: WithdrawalDecision,
+  ): WithdrawalRecord {
+    const adminId = admin.userId;
 
     const row = db.prepare(`SELECT ${COLUMNS} FROM withdrawals w WHERE w.id = ?`).get(withdrawalId) as
       | WithdrawalRow
@@ -200,6 +202,20 @@ export function createWithdrawalService(deps: { db: AppDatabase; now?: () => str
         } else {
           returnWithdrawal(db, { userId: row.user_id, withdrawalId, amount: row.amount, now: decidedAt });
         }
+
+        recordAudit(db, {
+          adminId,
+          action: decision.action === "paid" ? "withdrawal.paid" : "withdrawal.rejected",
+          targetUserId: row.user_id,
+          details: {
+            withdrawalId,
+            network: row.network,
+            payout: row.payout,
+            ...(decision.action === "paid" ? { txId } : { reason: decision.reason }),
+          },
+          ip: admin.ip,
+          now: decidedAt,
+        });
       });
     } catch (error) {
       if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) {

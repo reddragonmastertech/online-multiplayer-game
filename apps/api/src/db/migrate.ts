@@ -168,6 +168,45 @@ export const migrations: readonly Migration[] = [
        WHERE payout_tx_id IS NOT NULL`,
     ],
   },
+  {
+    // The admin area. `role` replaces `is_admin` (existing admins become
+    // owners). `token_version` ends every session when it goes up. The TOTP
+    // columns hold each admin's two-factor secret and the last time step
+    // used, so a code cannot be replayed. The audit log is append-only.
+    version: 5,
+    name: "admin roles, two-factor and audit log",
+    statements: [
+      `ALTER TABLE users ADD COLUMN role TEXT`,
+      `UPDATE users SET role = 'owner' WHERE is_admin = 1`,
+      `ALTER TABLE users DROP COLUMN is_admin`,
+      `ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`,
+      `ALTER TABLE users ADD COLUMN usdt_frozen INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE users ADD COLUMN totp_secret TEXT`,
+      `ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE users ADD COLUMN totp_last_step INTEGER`,
+      `ALTER TABLE users ADD COLUMN last_seen_at TEXT`,
+      `CREATE TABLE admin_audit (
+        id TEXT PRIMARY KEY,
+        admin_id TEXT NOT NULL REFERENCES users (id),
+        action TEXT NOT NULL,
+        target_user_id TEXT REFERENCES users (id),
+        details TEXT NOT NULL,
+        ip TEXT,
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX admin_audit_time ON admin_audit (created_at)`,
+      `CREATE INDEX admin_audit_target ON admin_audit (target_user_id, created_at)`,
+      `CREATE TABLE admin_notes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users (id),
+        admin_id TEXT NOT NULL REFERENCES users (id),
+        text TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX admin_notes_user ON admin_notes (user_id, created_at)`,
+    ],
+  },
 ];
 
 export function schemaVersion(client: SqliteClient) {

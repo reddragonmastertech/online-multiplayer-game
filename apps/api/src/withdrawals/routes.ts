@@ -1,6 +1,6 @@
 import { apiPaths, withdrawalDecisionSchema, withdrawalRequestSchema } from "@game-platform/shared";
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { authenticate } from "../auth/routes";
+import { authenticate, authenticateAdmin, type AuthContext } from "../auth/guard";
 import { HttpError, invalidInput, sendError } from "../http/errors";
 import type { WithdrawalService } from "./service";
 
@@ -13,19 +13,16 @@ async function respond<T>(reply: FastifyReply, work: () => T | Promise<T>) {
   }
 }
 
-export function registerWithdrawalRoutes(
-  app: FastifyInstance,
-  deps: { service: WithdrawalService; jwtSecret: string },
-) {
-  const { service, jwtSecret } = deps;
+export function registerWithdrawalRoutes(app: FastifyInstance, deps: { service: WithdrawalService; auth: AuthContext }) {
+  const { service, auth } = deps;
 
   app.get(apiPaths.withdrawals, async (request, reply) =>
-    respond(reply, () => ({ withdrawals: service.list(authenticate(request, jwtSecret).sub) })),
+    respond(reply, () => ({ withdrawals: service.list(authenticate(request, auth).sub) })),
   );
 
   app.post(apiPaths.withdrawals, async (request, reply) =>
     respond(reply, () => {
-      const userId = authenticate(request, jwtSecret).sub;
+      const userId = authenticate(request, auth).sub;
       const parsed = withdrawalRequestSchema.safeParse(request.body);
       if (!parsed.success) throw invalidInput();
       const withdrawal = service.request(userId, parsed.data.network, parsed.data.amount);
@@ -34,20 +31,22 @@ export function registerWithdrawalRoutes(
     }),
   );
 
-  // Admin only. The check reads `is_admin` from the database on every call,
-  // so revoking it takes effect at once, whatever the token says.
+  // Admin sessions only (two-factor), with the role read on every call.
   app.get(apiPaths.adminWithdrawals, async (request, reply) =>
-    respond(reply, () => ({ withdrawals: service.adminList(authenticate(request, jwtSecret).sub) })),
+    respond(reply, () => {
+      authenticateAdmin(request, auth, "view");
+      return { withdrawals: service.adminList() };
+    }),
   );
 
   app.post<{ Params: { id: string } }>(apiPaths.adminWithdrawalDecision, async (request, reply) =>
     respond(reply, () => {
-      const adminId = authenticate(request, jwtSecret).sub;
+      const admin = authenticateAdmin(request, auth, "withdrawals.decide");
       const parsed = withdrawalDecisionSchema.safeParse(request.body);
       if (!parsed.success) throw invalidInput("Give a transaction ID to mark it paid, or a reason to reject it.");
-      const withdrawal = service.decide(adminId, request.params.id, parsed.data);
+      const withdrawal = service.decide(admin, request.params.id, parsed.data);
       request.log.info(
-        { adminId, withdrawalId: withdrawal.id, status: withdrawal.status, payoutTxId: withdrawal.payoutTxId },
+        { adminId: admin.userId, withdrawalId: withdrawal.id, status: withdrawal.status, payoutTxId: withdrawal.payoutTxId },
         "withdrawal decided",
       );
       return { withdrawal };

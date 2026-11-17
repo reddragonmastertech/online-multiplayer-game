@@ -4,11 +4,12 @@ import type {
   ServerToClientEvents,
   SocketData,
 } from "@game-platform/shared";
-import { readBearerToken, verifyAccessToken } from "./jwt";
+import { checkToken, type AuthContext } from "./guard";
+import { readBearerToken } from "./jwt";
 
 export function attachSocketAuth(
   io: Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>,
-  jwtSecret: string,
+  auth: AuthContext,
 ) {
   io.use((socket, next) => {
     const handshakeToken = (socket.handshake.auth as { token?: unknown }).token;
@@ -24,10 +25,13 @@ export function attachSocketAuth(
       return;
     }
 
+    // Same checks as HTTP: a suspended account or an ended session cannot
+    // open a socket, so it cannot queue or play.
     try {
-      const payload = verifyAccessToken(token, jwtSecret);
+      const { payload } = checkToken(token, auth);
       socket.data.userId = payload.sub;
       socket.data.name = payload.name;
+      auth.db.prepare("UPDATE users SET last_seen_at = ? WHERE id = ?").run(new Date().toISOString(), payload.sub);
       next();
     } catch {
       next(new Error("unauthorized"));

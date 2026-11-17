@@ -16,6 +16,8 @@ import type { ChainClient } from "./deposits/chain";
 import { createChainClient, createFileChainClient } from "./deposits/client";
 import { registerDepositRoutes } from "./deposits/routes";
 import { createDepositService } from "./deposits/service";
+import { registerAdminRoutes } from "./admin/routes";
+import { createAdminService } from "./admin/service";
 import { registerWithdrawalRoutes } from "./withdrawals/routes";
 import { createWithdrawalService } from "./withdrawals/service";
 import { registerGames } from "./games/register";
@@ -58,8 +60,9 @@ export async function buildServer(config: AppConfig, overrides: { chain?: ChainC
       ? createFileChainClient(depositConfig.fakeChainFile)
       : createChainClient(depositConfig.chain));
   const deposits = createDepositService({ db, chain, addresses: depositConfig.addresses });
-  await registerDepositRoutes(app, { service: deposits, jwtSecret: config.jwtSecret });
-  registerWithdrawalRoutes(app, { service: createWithdrawalService({ db }), jwtSecret: config.jwtSecret });
+  const auth = { db, jwtSecret: config.jwtSecret };
+  await registerDepositRoutes(app, { service: deposits, auth });
+  registerWithdrawalRoutes(app, { service: createWithdrawalService({ db }), auth });
   if (depositConfig.fakeChainFile) {
     app.log.warn({ file: depositConfig.fakeChainFile }, "deposits read from a test file, not a real chain");
   }
@@ -71,14 +74,27 @@ export async function buildServer(config: AppConfig, overrides: { chain?: ChainC
     },
   );
 
-  attachSocketAuth(io, config.jwtSecret);
+  attachSocketAuth(io, { db, jwtSecret: config.jwtSecret });
 
   const released = releaseUnsettledMatches(db);
   if (released.matches > 0) {
     app.log.warn(released, "cancelled matches left unsettled by a previous process");
   }
 
-  const { queue, runtime } = registerMatchGateway(io, { db, log: app.log });
+  const gateway = registerMatchGateway(io, { db, log: app.log });
+  const { queue, runtime } = gateway;
+
+  const admin = createAdminService({
+    db,
+    jwtSecret: config.jwtSecret,
+    live: {
+      onlineCount: gateway.onlineCount,
+      liveMatches: () => runtime.size(),
+      queueWaiting: () => queue.size(),
+      disconnectUser: gateway.disconnectUser,
+    },
+  });
+  await registerAdminRoutes(app, { service: admin, auth });
 
   // Public: a visitor may browse matches in progress without an account. The
   // summary carries no hands, so there is nothing here to withhold.

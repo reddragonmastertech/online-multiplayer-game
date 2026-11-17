@@ -1,7 +1,7 @@
 import rateLimit from "@fastify/rate-limit";
 import { apiPaths, depositClaimSchema, saveDepositWalletSchema } from "@game-platform/shared";
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { authenticate } from "../auth/routes";
+import { authenticate, type AuthContext } from "../auth/guard";
 import { HttpError, invalidInput, sendError } from "../http/errors";
 import type { DepositService } from "./service";
 
@@ -16,17 +16,17 @@ async function respond<T>(reply: FastifyReply, work: () => T | Promise<T>) {
 
 export async function registerDepositRoutes(
   app: FastifyInstance,
-  deps: { service: DepositService; jwtSecret: string; claimRateLimit?: number },
+  deps: { service: DepositService; auth: AuthContext; claimRateLimit?: number },
 ) {
-  const { service, jwtSecret } = deps;
+  const { service, auth } = deps;
 
   app.get(apiPaths.deposits, async (request, reply) =>
-    respond(reply, () => service.overview(authenticate(request, jwtSecret).sub)),
+    respond(reply, () => service.overview(authenticate(request, auth).sub)),
   );
 
   app.post(apiPaths.depositWallets, async (request, reply) =>
     respond(reply, () => {
-      const userId = authenticate(request, jwtSecret).sub;
+      const userId = authenticate(request, auth).sub;
       const parsed = saveDepositWalletSchema.safeParse(request.body);
       if (!parsed.success) throw invalidInput();
       return service.saveWallet(userId, parsed.data.network, parsed.data.address);
@@ -46,7 +46,7 @@ export async function registerDepositRoutes(
 
     scope.post(apiPaths.depositClaim, async (request, reply) =>
       respond(reply, async () => {
-        const userId = authenticate(request, jwtSecret).sub;
+        const userId = authenticate(request, auth).sub;
         const parsed = depositClaimSchema.safeParse(request.body);
         if (!parsed.success) throw invalidInput();
         const deposit = await service.claim(userId, parsed.data.network, parsed.data.txId);

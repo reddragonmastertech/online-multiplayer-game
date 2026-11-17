@@ -346,6 +346,41 @@ paid, or rejects it. The server never holds a key.
 - **The ERC20 gas cost is the house's.** The admin pays gas when sending; a
   1% fee on a 10 USDT ERC20 withdrawal (0.1 USDT) will not cover it.
 
+### Roadmap 4.2 part D1 — the admin area
+
+An admin area at `/admin` with roles, two-factor, an audit log, a dashboard,
+player search and a player page with every action.
+
+- **Roles replace `is_admin`:** Owner, Finance, Moderator, Support, each a
+  fixed set of permissions in `packages/shared/src/admin.ts`. Migration 5
+  turned existing admins into owners and dropped the old column. There must
+  always be one owner.
+- **Two-factor is built in, not a library.** TOTP (RFC 6238) is a short HMAC
+  over the time; `admin/totp.ts` is checked against the RFC's own test
+  vectors. A code works once: the last used time step is stored. Passing it
+  gives an admin-scope token for 8 hours, which only the admin API accepts;
+  the player token cannot open admin endpoints and vice versa.
+- **Sessions can now be ended.** Every token carries the user's token
+  version, and every HTTP request and socket checks it against the database
+  along with the account status. Suspending, setting a temporary password,
+  "log out everywhere" and any role change bump it and close the player's
+  sockets. A token for an account that no longer exists is refused too; one
+  chat test had relied on that and now creates its outsider.
+- **Every admin change writes an audit row in the same transaction,** with
+  the admin, the target, the details (including the required reason) and the
+  IP. Nothing in the site edits or deletes them. Failed two-factor attempts
+  are logged as well.
+- **Frozen USDT** blocks USDT stakes in the gateway and withdrawal requests;
+  deposits still arrive, and RAC play is untouched.
+- **The dashboard's alerts check the books:** each currency's ledger must
+  sum to its balances, every finished match must have payout rows, and no
+  withdrawal should wait over 24 hours.
+- **A real accessibility bug, found by the tests:** every admin form gave its
+  "Reason" input the same `id`, so each label pointed at the first form's
+  input. Fields now use `useId`.
+- **Not built here:** the chain-reader alert (needs D2's health checks), and
+  a change-password screen for players (Roadmap 4.4), so a temporary password
+  stays until an admin sets another.
 ---
 
 ## Deliberately not built

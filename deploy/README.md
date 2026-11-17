@@ -68,14 +68,19 @@ Optional:
 
 ### Handling withdrawals
 
-1. Make yourself an admin, once:
-   `pnpm --filter @game-platform/api admin -- "<your display name>" on`.
+1. Make yourself the owner, once:
+   `pnpm --filter @game-platform/api admin -- "<your display name>" owner`.
    Reload the site; an **Admin** link appears in the header.
-2. `/admin` lists waiting requests with the exact amount, network and address.
+2. The first time you open `/admin`, set up two-factor: scan or type the
+   setup key into Google Authenticator or Authy and enter the 6-digit code.
+   Every admin session after that asks for a fresh code and lasts 8 hours.
+   Lost your phone? Another owner can reset it on your player page; if you
+   are the only owner, run `admin -- "<name>" reset-2fa` on the server.
+3. `/admin/withdrawals` lists waiting requests with the exact amount, network and address.
    Send that amount from your own wallet, paste the transaction ID, and press
    **Mark paid**. Or give a reason and **Reject**: the player gets the full
    amount back.
-3. On ERC20 the gas you pay can be more than the 1% fee on a small request.
+4. On ERC20 the gas you pay can be more than the 1% fee on a small request.
 
 Never set `DEPOSIT_CHAIN_FAKE_FILE` here. It is for the browser tests, and
 the server refuses to start with it in production.

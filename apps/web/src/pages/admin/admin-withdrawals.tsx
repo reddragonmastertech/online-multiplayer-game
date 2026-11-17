@@ -1,39 +1,20 @@
-import { NETWORK_INFO, formatAmount, type AdminWithdrawal } from "@game-platform/shared";
-import { Check, Copy } from "lucide-react";
+import { NETWORK_INFO, can, formatAmount, type AdminWithdrawal } from "@game-platform/shared";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ApiRequestError, adminWithdrawalsRequest, decideWithdrawal } from "@/lib/api";
-import { useSessionStore } from "@/stores/session-store";
+import { adminDecideWithdrawal, adminWithdrawalsRequest, useAdminSession } from "@/lib/admin-api";
 import { cn } from "@/lib/utils";
-
-const inputClass =
-  "h-9 w-full min-w-0 rounded-xl border border-border bg-black/40 px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring";
-
-function CopyButton({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      aria-label={label}
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          setCopied(true);
-          window.setTimeout(() => setCopied(false), 2000);
-        } catch {
-          // Clipboard can be blocked; the text is still selectable.
-        }
-      }}
-    >
-      {copied ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
-    </Button>
-  );
-}
+import { CopyButton, inputClass, messageOf } from "./admin-ui";
 
 /** One pending request: what to send, where, and the two ways to close it. */
-function PendingRow({ item, onDecided }: { item: AdminWithdrawal; onDecided: () => Promise<void> }) {
+function PendingRow({
+  item,
+  canDecide,
+  onDecided,
+}: {
+  item: AdminWithdrawal;
+  canDecide: boolean;
+  onDecided: () => Promise<void>;
+}) {
   const [txId, setTxId] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -46,10 +27,10 @@ function PendingRow({ item, onDecided }: { item: AdminWithdrawal; onDecided: () 
     setBusy(true);
     setError(null);
     try {
-      await decideWithdrawal(item.id, action === "paid" ? { action, txId } : { action, reason });
+      await adminDecideWithdrawal(item.id, action === "paid" ? { action, txId } : { action, reason });
       await onDecided();
     } catch (cause) {
-      setError(cause instanceof ApiRequestError ? cause.message : "Something went wrong. Try again.");
+      setError(messageOf(cause));
       setBusy(false);
     }
   }
@@ -76,6 +57,7 @@ function PendingRow({ item, onDecided }: { item: AdminWithdrawal; onDecided: () 
         <CopyButton text={item.address} label={`Copy ${item.userName}'s address`} />
       </div>
 
+      {canDecide ? (
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <form onSubmit={(event) => decide(event, "paid")} className="space-y-1.5">
           <label htmlFor={`tx-${item.id}`} className="block text-xs text-muted-foreground">
@@ -113,6 +95,9 @@ function PendingRow({ item, onDecided }: { item: AdminWithdrawal; onDecided: () 
           </div>
         </form>
       </div>
+      ) : (
+        <p className="mt-3 text-xs text-muted-foreground">Your role can see this request but not decide it.</p>
+      )}
       {error ? (
         <p role="alert" className="mt-2 text-sm font-semibold text-danger">
           {error}
@@ -122,9 +107,8 @@ function PendingRow({ item, onDecided }: { item: AdminWithdrawal; onDecided: () 
   );
 }
 
-export function AdminPage() {
-  const user = useSessionStore((state) => state.user);
-  const status = useSessionStore((state) => state.status);
+export function AdminWithdrawalsPage() {
+  const role = useAdminSession((state) => state.session?.role);
   const [items, setItems] = useState<AdminWithdrawal[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -133,38 +117,20 @@ export function AdminPage() {
       setItems((await adminWithdrawalsRequest()).withdrawals);
       setLoadError(null);
     } catch (cause) {
-      setLoadError(cause instanceof ApiRequestError ? cause.message : "Could not load withdrawals.");
+      setLoadError(messageOf(cause));
     }
   }, []);
 
   useEffect(() => {
-    if (user?.isAdmin) void load();
-  }, [user, load]);
-
-  if (status === "boot") {
-    return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
-  }
-
-  if (!user?.isAdmin) {
-    return (
-      <div className="grid h-full place-items-center p-6">
-        <section className="max-w-md rounded-3xl border border-border bg-card p-8 text-center">
-          <h1 className="font-display text-3xl font-bold">Admin</h1>
-          <p className="mt-3 text-sm text-muted-foreground">This page is for admins only.</p>
-          <Button className="mt-6" asChild>
-            <Link to="/lobby">Back to games</Link>
-          </Button>
-        </section>
-      </div>
-    );
-  }
+    void load();
+  }, [load]);
 
   const pending = (items ?? []).filter((item) => item.status === "pending");
   const decided = (items ?? []).filter((item) => item.status !== "pending");
 
   return (
-    <div className="min-h-full overflow-y-auto">
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+    <div className="max-w-3xl">
+      <div>
         <h1 className="font-display text-4xl font-bold">Withdrawals</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Send each payout from your own wallet, then mark it paid with the transaction ID. Rejecting returns the full
@@ -188,7 +154,7 @@ export function AdminPage() {
         ) : (
           <ul className="mt-3 space-y-3">
             {pending.map((item) => (
-              <PendingRow key={item.id} item={item} onDecided={load} />
+              <PendingRow key={item.id} item={item} canDecide={can(role, "withdrawals.decide")} onDecided={load} />
             ))}
           </ul>
         )}
@@ -215,7 +181,7 @@ export function AdminPage() {
             ))}
           </ul>
         )}
-      </main>
+      </div>
     </div>
   );
 }

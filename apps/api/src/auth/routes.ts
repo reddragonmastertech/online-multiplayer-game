@@ -5,7 +5,7 @@ import {
   loginRequestSchema,
   signupRequestSchema,
 } from "@game-platform/shared";
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance } from "fastify";
 import type { AppDatabase } from "../db/client";
 import { withTransaction } from "../db/client";
 import {
@@ -16,8 +16,9 @@ import {
   sendError,
   unauthorized,
 } from "../http/errors";
+import { authenticate, suspended } from "./guard";
 import { loadMatchHistory } from "../match/history";
-import { readBearerToken, signAccessToken, verifyAccessToken } from "./jwt";
+import { signAccessToken } from "./jwt";
 import { hashPassword, verifyPassword } from "./password";
 import { openWallets, readWallets } from "../economy/wallet";
 import { findUserByEmail, loadAccount, toPublicUser } from "./session";
@@ -36,19 +37,6 @@ function uniqueConstraintColumn(error: unknown) {
   }
 
   return "unknown";
-}
-
-export function authenticate(request: FastifyRequest, jwtSecret: string) {
-  const token = readBearerToken(request.headers.authorization);
-  if (!token) {
-    throw unauthorized();
-  }
-
-  try {
-    return verifyAccessToken(token, jwtSecret);
-  } catch {
-    throw unauthorized();
-  }
 }
 
 /**
@@ -150,6 +138,9 @@ export async function registerAuthRoutes(
       if (!user || !(await verifyPassword(parsed.data.password, String(user.password_hash ?? "")))) {
         return sendError(reply, invalidCredentials());
       }
+      if (user.status === "suspended") {
+        return sendError(reply, suspended());
+      }
 
       const account = loadAccount(db, user.id);
       if (!account) {
@@ -157,7 +148,10 @@ export async function registerAuthRoutes(
       }
 
       return {
-        token: signAccessToken({ sub: user.id, name: user.name, email: user.email }, jwtSecret),
+        token: signAccessToken(
+          { sub: user.id, name: user.name, email: user.email, tv: user.token_version ?? 0 },
+          jwtSecret,
+        ),
         ...account,
       };
     });
@@ -165,7 +159,8 @@ export async function registerAuthRoutes(
 
   app.get(apiPaths.me, async (request, reply) => {
     try {
-      const payload = authenticate(request, jwtSecret);
+      const payload = authenticate(request, { db, jwtSecret });
+      db.prepare("UPDATE users SET last_seen_at = ? WHERE id = ?").run(new Date().toISOString(), payload.sub);
       const account = loadAccount(db, payload.sub);
       if (!account) {
         return sendError(reply, unauthorized());
@@ -181,7 +176,7 @@ export async function registerAuthRoutes(
 
   app.get(apiPaths.matches, async (request, reply) => {
     try {
-      const payload = authenticate(request, jwtSecret);
+      const payload = authenticate(request, { db, jwtSecret });
       return { matches: loadMatchHistory(db, payload.sub) };
     } catch (error) {
       if (error instanceof HttpError) {

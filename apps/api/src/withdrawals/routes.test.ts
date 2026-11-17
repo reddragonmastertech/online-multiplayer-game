@@ -29,13 +29,13 @@ async function start() {
     loginRateLimit: 100,
     webDist: join(dir, "no-such-dist"),
   });
-  for (const [id, admin] of [
-    ["ann", 0],
-    ["boss", 1],
+  for (const [id, role] of [
+    ["ann", null],
+    ["boss", "owner"],
   ] as const) {
     server.db
-      .prepare("INSERT INTO users (id, name, email, password_hash, created_at, is_admin) VALUES (?, ?, ?, 'x', 'now', ?)")
-      .run(id, id, `${id}@example.test`, admin);
+      .prepare("INSERT INTO users (id, name, email, password_hash, created_at, role, totp_enabled) VALUES (?, ?, ?, 'x', 'now', ?, ?)")
+      .run(id, id, `${id}@example.test`, role, role ? 1 : 0);
     openWallets(server.db, id, "2026-01-01T00:00:00.000Z");
   }
   server.db
@@ -46,17 +46,21 @@ async function start() {
   const headers = (id: string) => ({
     authorization: `Bearer ${signAccessToken({ sub: id, name: id, email: `${id}@example.test` }, SECRET)}`,
   });
-  return { ...server, headers };
+  // What an admin holds after passing a two-factor code.
+  const adminHeaders = (id: string) => ({
+    authorization: `Bearer ${signAccessToken({ sub: id, name: id, email: `${id}@example.test`, scope: "admin" }, SECRET, 3600)}`,
+  });
+  return { ...server, headers, adminHeaders };
 }
 
 describe("withdrawal routes", () => {
   it("runs a request through to paid, and keeps players out of the admin endpoints", async () => {
-    const { app, headers } = await start();
+    const { app, headers, adminHeaders } = await start();
 
     const me = (await app.inject({ method: "GET", url: "/api/me", headers: headers("boss") })).json();
-    expect(me.user.isAdmin).toBe(true);
+    expect(me.user.role).toBe("owner");
     const ann = (await app.inject({ method: "GET", url: "/api/me", headers: headers("ann") })).json();
-    expect(ann.user.isAdmin).toBeUndefined();
+    expect(ann.user.role).toBeUndefined();
 
     const requested = await app.inject({
       method: "POST",
@@ -67,23 +71,31 @@ describe("withdrawal routes", () => {
     expect(requested.statusCode).toBe(200);
     const { id } = requested.json().withdrawal;
 
+    // A player's own login token is refused by the admin API.
     const asPlayer = await app.inject({ method: "GET", url: "/api/admin/withdrawals", headers: headers("ann") });
-    expect(asPlayer.statusCode).toBe(403);
+    expect(asPlayer.statusCode).toBe(401);
+    // Even a forged-looking admin-scope token is refused without a role.
+    const playerWithAdminScope = await app.inject({ method: "GET", url: "/api/admin/withdrawals", headers: adminHeaders("ann") });
+    expect(playerWithAdminScope.statusCode).toBe(403);
+    // An admin's normal login token is not enough: it needs the two-factor session.
+    const bossWithoutCode = await app.inject({ method: "GET", url: "/api/admin/withdrawals", headers: headers("boss") });
+    expect(bossWithoutCode.statusCode).toBe(401);
+    expect(bossWithoutCode.json().error.code).toBe("two_factor_required");
     const decideAsPlayer = await app.inject({
       method: "POST",
       url: `/api/admin/withdrawals/${id}`,
-      headers: headers("ann"),
+      headers: adminHeaders("ann"),
       payload: { action: "reject", reason: "self-service" },
     });
     expect(decideAsPlayer.statusCode).toBe(403);
 
-    const list = (await app.inject({ method: "GET", url: "/api/admin/withdrawals", headers: headers("boss") })).json();
+    const list = (await app.inject({ method: "GET", url: "/api/admin/withdrawals", headers: adminHeaders("boss") })).json();
     expect(list.withdrawals).toEqual([expect.objectContaining({ id, userName: "ann", payout: 9_900_000, status: "pending" })]);
 
     const paid = await app.inject({
       method: "POST",
       url: `/api/admin/withdrawals/${id}`,
-      headers: headers("boss"),
+      headers: adminHeaders("boss"),
       payload: { action: "paid", txId: `0x${"cd".repeat(32)}` },
     });
     expect(paid.statusCode).toBe(200);

@@ -62,6 +62,7 @@ TypeScript type from the same definition.
 | `src/chat.ts` | Match chat messages, `CHAT_RULES` limits, quick reactions |
 | `src/deposit.ts` | USDT deposits: networks, `DEPOSIT_RULES` (minimum, fee), address and TxID checks, request and response shapes |
 | `src/withdrawal.ts` | USDT withdrawals: `WITHDRAWAL_RULES` (minimum, fee), request, record and admin decision shapes |
+| `src/admin.ts` | The admin area: roles, `ROLE_PERMISSIONS`, `can()`, request schemas and response types |
 | `src/index.ts` | Re-exports everything; this is what others import |
 
 **Start here when adding a feature.** Define the shape first, then the server
@@ -133,11 +134,12 @@ src/
 ├── index.ts          entry point: start, and shut down cleanly
 ├── server.ts         assembles everything; read this first
 ├── config.ts         environment variables, validated
-├── auth/             who you are
+├── auth/             who you are (`guard.ts` checks every token against the database)
 ├── db/               SQLite connection and schema
 ├── economy/          money: locking, refunding, settling, per currency
 ├── deposits/         USDT deposits: reading chains, checking and crediting claims
 ├── withdrawals/      USDT withdrawals: requests, and the admin's paid / rejected decision
+├── admin/            the admin area: two-factor, dashboard, players, audit log
 ├── scripts/          admin tools run by hand (`pnpm balance`, `pnpm admin`)
 ├── match/            the queue and the live match loop
 ├── http/             error helpers, serving the built site
@@ -183,11 +185,13 @@ endpoint that hands out 100 RAC. It opens a USDT wallet at 0 too.
   again.
 - `schema.ts` — Drizzle table definitions, used for typing.
 
-Ten tables: `users`, `wallets` (one row per user per currency),
+Twelve tables: `users`, `wallets` (one row per user per currency),
 `ledger_entries`, `matches` (with the currency), `match_players`,
 `match_rounds`, `house_ledger` (the house's cut of each USDT match and each
-deposit fee, migration 2), `deposit_wallets` and `deposits` (migration 3), and `withdrawals`
-(migration 4, which also added `users.is_admin`).
+deposit fee, migration 2), `deposit_wallets` and `deposits` (migration 3), `withdrawals`
+(migration 4), and `admin_audit` and `admin_notes` (migration 5, which also
+added roles, account status, frozen USDT, token versions and two-factor to
+`users`).
 
 ### `economy/wallet.ts` — the money rules
 
@@ -244,6 +248,20 @@ UNIQUE (network, tx_id) makes a second credit impossible. Tests pass a fake
 
 Admin checks read `users.is_admin` from the database on every call. The
 only way to set it is `pnpm --filter @game-platform/api admin -- "<name>" on`.
+
+### `admin/` — running the site
+
+| File | Role |
+|---|---|
+| `totp.ts` | Two-factor codes (RFC 6238) and setup keys |
+| `audit.ts` | Writes and reads the append-only audit log |
+| `service.ts` | Two-factor sessions, dashboard, search, the player page and every player action |
+| `routes.ts` | `/api/admin/*`; each route names the permission it needs |
+
+`auth/guard.ts` is what every request goes through: `authenticate` for players
+(account exists, not suspended, current token version) and `authenticateAdmin`
+for admin calls (an admin-scope token from a two-factor code, plus the
+permission). Roles are read from the database on every call.
 
 ### `match/` — the heart of it
 
@@ -381,8 +399,10 @@ Adding chess means writing `chess-board.tsx` and one line in `game-surface.tsx`.
 
 The Top Up dialog is `components/wallet/top-up-dialog.tsx`, opened from the
 account page (`/account?topup=usdt`). The withdraw form is
-`components/wallet/withdraw-panel.tsx`, and admins handle requests on
-`pages/admin-page.tsx` (`/admin`).
+`components/wallet/withdraw-panel.tsx`. The admin area is `pages/admin/`:
+`admin-layout.tsx` (the two-factor gate and tabs), then one file per tab
+(dashboard, players, player, withdrawals, audit, admins). Admin calls go
+through `lib/admin-api.ts`, which holds the admin session in sessionStorage.
 | `utils.ts` | `cn()` for merging Tailwind classes |
 
 ### `index.css` — the theme
@@ -442,6 +462,7 @@ Notice what the browser never does: judge a round, change a score, or move money
 | `apps/api/src/economy/amount.test.ts` | Stakes, the 10% cut, formatting and parsing amounts | `pnpm test` |
 | `apps/api/src/deposits/*.test.ts` | Deposit claims against a fake chain, the HTTP routes, receipt parsing and Tron addresses | `pnpm test` |
 | `apps/api/src/withdrawals/*.test.ts` | Locking, paid, rejected, decide-once, admin-only | `pnpm test` |
+| `apps/api/src/admin/*.test.ts` | Two-factor (RFC vectors, replay), roles, actions, suspension, the audit log | `pnpm test` |
 | `apps/api/src/match/queue.test.ts` | Pairing, no self-pairing, never across currencies | `pnpm test` |
 | `apps/api/src/match/chat.test.ts` | Chat length, rate limit, history | `pnpm test` |
 | `apps/api/src/match/gateway.test.ts` | Real sockets: chat reaches players, never spectators; USDT stakes checked and locked | `pnpm test` |
@@ -465,7 +486,7 @@ queue, so parallel tests would pair with each other's players.
 | Change a game rule number | `packages/shared/src/economy.ts` → `MATCH_RULES` |
 | Change a stake or the house cut | `packages/shared/src/economy.ts` → `CURRENCY_RULES` |
 | Correct a player's balance by hand | `pnpm --filter @game-platform/api balance -- "<name>" usdt 5` |
-| Make someone an admin | `pnpm --filter @game-platform/api admin -- "<name>" on` |
+| Make the first owner | `pnpm --filter @game-platform/api admin -- "<name>" owner`; after that, `/admin/admins` |
 | Change how RPS is scored | `packages/games/rps/src/engine.ts` |
 | Add an API endpoint | `packages/shared/src/auth.ts` (`apiPaths`), then `apps/api/src/auth/routes.ts` |
 | Add a socket event | `packages/shared/src/socket.ts`, then `apps/api/src/match/gateway.ts` |

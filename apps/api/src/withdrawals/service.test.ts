@@ -8,6 +8,7 @@ import { createWithdrawalService } from "./service";
 
 const ANN_TRC20 = "TD5gsCwxykWsLN9aPrq2TAfNjByuZKYp4E";
 const PAYOUT_TX = "ab".repeat(32);
+const BOSS = { userId: "boss" };
 
 let db: AppDatabase;
 let service: ReturnType<typeof createWithdrawalService>;
@@ -37,13 +38,13 @@ beforeEach(() => {
   db = new DatabaseSync(":memory:");
   db.exec("PRAGMA foreign_keys = ON");
   migrateSqlite(db);
-  for (const [id, admin] of [
-    ["ann", 0],
-    ["boss", 1],
+  for (const [id, role] of [
+    ["ann", null],
+    ["boss", "owner"],
   ] as const) {
     db.prepare(
-      "INSERT INTO users (id, name, email, password_hash, created_at, is_admin) VALUES (?, ?, ?, 'x', 'now', ?)",
-    ).run(id, id, `${id}@example.test`, admin);
+      "INSERT INTO users (id, name, email, password_hash, created_at, role) VALUES (?, ?, ?, 'x', 'now', ?)",
+    ).run(id, id, `${id}@example.test`, role);
     openWallets(db, id, "2026-01-01T00:00:00.000Z");
   }
   db.prepare("INSERT INTO deposit_wallets (user_id, network, address, created_at) VALUES ('ann', 'trc20', ?, 'now')").run(
@@ -101,19 +102,19 @@ describe("admin decisions", () => {
   it("marks a request paid: the money leaves, the fee goes to the house", () => {
     const { id } = service.request("ann", "trc20", 10_000_000);
 
-    const paid = service.decide("boss", id, { action: "paid", txId: PAYOUT_TX.toUpperCase() });
+    const paid = service.decide(BOSS, id, { action: "paid", txId: PAYOUT_TX.toUpperCase() });
 
     expect(paid).toMatchObject({ status: "paid", payoutTxId: PAYOUT_TX });
     expect(usdt("ann")).toEqual({ available: 15_000_000, locked: 0 });
     expect(houseTotal(db, "usdt")).toBe(100_000);
     expect(service.list("ann")[0]).toMatchObject({ status: "paid" });
-    expect(service.adminList("boss")[0]).toMatchObject({ userName: "ann", decidedBy: "boss" });
+    expect(service.adminList()[0]).toMatchObject({ userName: "ann", decidedBy: "boss" });
   });
 
   it("rejects a request: the full amount comes back, with the reason", () => {
     const { id } = service.request("ann", "trc20", 10_000_000);
 
-    const rejected = service.decide("boss", id, { action: "reject", reason: "Wallet looks wrong" });
+    const rejected = service.decide(BOSS, id, { action: "reject", reason: "Wallet looks wrong" });
 
     expect(rejected).toMatchObject({ status: "rejected", note: "Wallet looks wrong" });
     expect(usdt("ann")).toEqual({ available: 25_000_000, locked: 0 });
@@ -126,9 +127,9 @@ describe("admin decisions", () => {
 
   it("decides a request only once", () => {
     const { id } = service.request("ann", "trc20", 10_000_000);
-    service.decide("boss", id, { action: "paid", txId: PAYOUT_TX });
+    service.decide(BOSS, id, { action: "paid", txId: PAYOUT_TX });
 
-    expect(refusal(() => service.decide("boss", id, { action: "reject", reason: "oops" }))).toMatchObject({
+    expect(refusal(() => service.decide(BOSS, id, { action: "reject", reason: "oops" }))).toMatchObject({
       message: "That withdrawal is already paid.",
     });
     expect(usdt("ann")).toEqual({ available: 15_000_000, locked: 0 });
@@ -136,10 +137,10 @@ describe("admin decisions", () => {
 
   it("will not reuse one payout transaction for two requests", () => {
     const first = service.request("ann", "trc20", 10_000_000);
-    service.decide("boss", first.id, { action: "paid", txId: PAYOUT_TX });
+    service.decide(BOSS, first.id, { action: "paid", txId: PAYOUT_TX });
     const second = service.request("ann", "trc20", 10_000_000);
 
-    expect(refusal(() => service.decide("boss", second.id, { action: "paid", txId: PAYOUT_TX }))).toMatchObject({
+    expect(refusal(() => service.decide(BOSS, second.id, { action: "paid", txId: PAYOUT_TX }))).toMatchObject({
       message: "That transaction ID already settles another withdrawal.",
     });
     // The failed decision rolled back: still pending, still locked.
@@ -149,18 +150,23 @@ describe("admin decisions", () => {
 
   it("checks the payout transaction ID's shape for the network", () => {
     const { id } = service.request("ann", "trc20", 10_000_000);
-    expect(refusal(() => service.decide("boss", id, { action: "paid", txId: "nope" }))).toMatchObject({
+    expect(refusal(() => service.decide(BOSS, id, { action: "paid", txId: "nope" }))).toMatchObject({
       code: "invalid_input",
     });
   });
 
-  it("refuses everyone who is not an admin", () => {
-    const { id } = service.request("ann", "trc20", 10_000_000);
+  it("refuses a request while the player's USDT is frozen", () => {
+    db.prepare("UPDATE users SET usdt_frozen = 1 WHERE id = 'ann'").run();
 
-    expect(refusal(() => service.adminList("ann"))).toMatchObject({ code: "forbidden" });
-    expect(refusal(() => service.decide("ann", id, { action: "paid", txId: PAYOUT_TX }))).toMatchObject({
-      code: "forbidden",
-    });
-    expect(usdt("ann")).toEqual({ available: 15_000_000, locked: 10_000_000 });
+    expect(refusal(() => service.request("ann", "trc20", 10_000_000))).toMatchObject({ code: "forbidden" });
+    expect(usdt("ann")).toEqual({ available: 25_000_000, locked: 0 });
+  });
+
+  it("writes every decision to the audit log", () => {
+    const { id } = service.request("ann", "trc20", 10_000_000);
+    service.decide({ userId: "boss", ip: "203.0.113.9" }, id, { action: "paid", txId: PAYOUT_TX });
+
+    const audit = db.prepare("SELECT admin_id, action, target_user_id, ip FROM admin_audit").all();
+    expect(audit).toEqual([{ admin_id: "boss", action: "withdrawal.paid", target_user_id: "ann", ip: "203.0.113.9" }]);
   });
 });

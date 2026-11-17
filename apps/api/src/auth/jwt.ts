@@ -3,11 +3,17 @@ import { displayNameSchema, emailSchema, userIdSchema } from "@game-platform/sha
 import { z } from "zod";
 
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
+/** An admin session lasts one working day, then asks for a fresh code. */
+export const ADMIN_TOKEN_TTL_SECONDS = 60 * 60 * 8;
 
 const accessTokenPayloadSchema = z.object({
   sub: userIdSchema,
   name: displayNameSchema,
   email: emailSchema,
+  /** The user's token version when this was signed; a newer version ends it. */
+  tv: z.number().int().nonnegative().optional(),
+  /** "admin" for an admin session, which only the admin API accepts. */
+  scope: z.literal("admin").optional(),
   iat: z.number().int(),
   exp: z.number().int(),
 });
@@ -29,14 +35,15 @@ function signaturesMatch(left: string, right: string) {
 }
 
 export function signAccessToken(
-  payload: Pick<AccessTokenPayload, "sub" | "name" | "email">,
+  payload: Pick<AccessTokenPayload, "sub" | "name" | "email" | "tv" | "scope">,
   secret: string,
+  ttlSeconds = TOKEN_TTL_SECONDS,
 ) {
   const now = Math.floor(Date.now() / 1000);
   const body = {
     ...payload,
     iat: now,
-    exp: now + TOKEN_TTL_SECONDS,
+    exp: now + ttlSeconds,
   };
   const header = encode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const claims = encode(JSON.stringify(body));

@@ -1,6 +1,5 @@
 import {
   apiPaths,
-  type AdminWithdrawalList,
   type AuthSuccess,
   type DepositClaim,
   type DepositClaimResponse,
@@ -11,7 +10,6 @@ import {
   type MatchHistoryResponse,
   type MeResponse,
   type SignupRequest,
-  type WithdrawalDecision,
   type WithdrawalList,
   type WithdrawalRecord,
   type WithdrawalRequest,
@@ -43,9 +41,9 @@ export function setStoredToken(token: string | null) {
   window.localStorage.removeItem(TOKEN_STORAGE_KEY);
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+/** Sends a request with a bearer token: the player's login token unless another is given. */
+export async function apiRequest<T>(path: string, init: RequestInit = {}, token: string | null = getStoredToken()): Promise<T> {
   const headers = new Headers(init.headers);
-  const token = getStoredToken();
 
   if (init.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -71,6 +69,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   return payload as T;
+}
+
+function request<T>(path: string, init: RequestInit = {}) {
+  return apiRequest<T>(path, init);
 }
 
 export function signupRequest(body: SignupRequest) {
@@ -128,13 +130,3 @@ export function requestWithdrawal(body: WithdrawalRequest) {
   });
 }
 
-export function adminWithdrawalsRequest() {
-  return request<AdminWithdrawalList>(apiPaths.adminWithdrawals);
-}
-
-export function decideWithdrawal(id: string, body: WithdrawalDecision) {
-  return request<{ withdrawal: WithdrawalRecord }>(
-    apiPaths.adminWithdrawalDecision.replace(":id", encodeURIComponent(id)),
-    { method: "POST", body: JSON.stringify(body) },
-  );
-}

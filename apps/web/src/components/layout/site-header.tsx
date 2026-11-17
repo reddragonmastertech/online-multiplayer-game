@@ -35,7 +35,7 @@ function AuthActions({ onNavigate }: { onNavigate?: () => void }) {
   if (user) {
     return (
       <>
-        {user.isAdmin ? (
+        {user.role ? (
           <Button variant="ghost" size="sm" asChild>
             <Link to="/admin" onClick={onNavigate}>
               Admin

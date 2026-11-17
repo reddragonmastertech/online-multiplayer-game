@@ -13,6 +13,8 @@ const TABLES = [
   "deposit_wallets",
   "deposits",
   "withdrawals",
+  "admin_audit",
+  "admin_notes",
 ];
 
 function tableNames(db: DatabaseSync) {

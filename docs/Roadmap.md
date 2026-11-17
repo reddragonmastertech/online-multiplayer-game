@@ -329,26 +329,28 @@ the site grows.
 
 ##### D1: Foundation (about 4–5 days)
 
-- [ ] **Roles:** Owner (everything, including managing admins), Finance
+- [x] **Roles:** Owner (everything, including managing admins), Finance
       (money), Moderator (players, matches, chat), Support (read-only).
       Replaces the single `is_admin` flag; existing admins become Owner.
-- [ ] **Two-factor login** for every admin (TOTP: Google Authenticator,
+- [x] **Two-factor login** for every admin (TOTP: Google Authenticator,
       Authy). Admin pages and admin API calls refuse an admin without it.
-- [ ] **Audit log:** every admin action with who, what, when, before and
+- [x] **Audit log:** every admin action with who, what, when, before and
       after, and the IP. Nobody can edit or delete it from the site.
-- [ ] **Dashboard:** players (total, new, online now); matches (live, today,
+- [x] **Dashboard:** players (total, new, online now); matches (live, today,
       RAC and USDT volume); money (USDT held for players, deposits today,
       withdrawals waiting and paid, house earnings by kind and period);
       alerts (a withdrawal waiting over 24 hours, balances not adding up, a
-      failed settlement, a chain reader unreachable).
-- [ ] **Player search** by name, email, ID, wallet address or TxID.
-- [ ] **Player page:** balances, saved wallets, deposits, withdrawals,
+      failed settlement, a chain reader unreachable). **Not yet:** the chain reader
+      alert; it needs the D2 health checks.
+- [x] **Player search** by name, email, ID, wallet address or TxID.
+- [x] **Player page:** balances, saved wallets, deposits, withdrawals,
       matches, the full ledger, signup date, last seen, admin notes.
-- [ ] **Player actions,** each with a required reason in the audit log:
+- [x] **Player actions,** each with a required reason in the audit log:
       adjust a balance (replaces `pnpm balance` for daily use), suspend
       (cannot log in), freeze USDT (can play RAC, cannot stake or withdraw
-      USDT), release a saved wallet, set a temporary password, rename.
-- [ ] **Log out everywhere:** a token version on the user, checked on every
+      USDT), release a saved wallet, set a temporary password, rename. The owner can also reset an
+      admin's two-factor (lost phone).
+- [x] **Log out everywhere:** a token version on the user, checked on every
       request, so a suspension or password reset ends live sessions.
 
 ##### D2: Money safety (about 4 days)
