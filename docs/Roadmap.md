@@ -301,18 +301,106 @@ The server never holds a private key and never sends money by itself.
 step, and a rejected request returns the full amount. **Done:**
 `withdrawals/service.test.ts` and `e2e/usdt.spec.ts` check both paths.
 
-#### Part D: running real money
+#### Part D: the admin area
 
-- [ ] **Admin lookup:** find a user and see their deposits, withdrawals,
-      matches and ledger.
-- [ ] **Daily reconciliation:** the sum of USDT balances (including locked)
-      must equal deposits credited − withdrawals paid − house cuts. A mismatch
-      is logged as an error.
+Everything an admin needs to run the site, not only the money. Today an
+admin can handle withdrawals at `/admin`; making admins (`pnpm admin`) and
+correcting balances (`pnpm balance`) need the command line, and everything
+else needs the database.
+
+Already done in earlier parts:
+
 - [x] **House earnings:** `pnpm balance` prints the total of match cuts,
       deposit fees and withdrawal fees in `house_ledger`.
-- [ ] **Backups before every upgrade,** now a hard rule rather than advice.
 - [x] **Legal, before Part B goes live.** The owner has confirmed that it is
       legal where the site operates. Recorded in the build log.
+
+**Defaults taken, change any of them before the phase that uses it:**
+
+| Question | Default |
+|---|---|
+| Who are the admins? | Built with roles, so staff can be added later. The owner holds every role. |
+| Two-factor login for admins? | Required, with an authenticator app (TOTP). |
+| Store login IP addresses? | Yes, from D4, with a line in the privacy page. |
+| Second approval for large withdrawals? | Above 500 USDT, set in `.env`. Off while there is only one admin. |
+
+D1 and D2 come before taking real deposits at any scale. D3 to D5 follow as
+the site grows.
+
+##### D1: Foundation (about 4–5 days)
+
+- [ ] **Roles:** Owner (everything, including managing admins), Finance
+      (money), Moderator (players, matches, chat), Support (read-only).
+      Replaces the single `is_admin` flag; existing admins become Owner.
+- [ ] **Two-factor login** for every admin (TOTP: Google Authenticator,
+      Authy). Admin pages and admin API calls refuse an admin without it.
+- [ ] **Audit log:** every admin action with who, what, when, before and
+      after, and the IP. Nobody can edit or delete it from the site.
+- [ ] **Dashboard:** players (total, new, online now); matches (live, today,
+      RAC and USDT volume); money (USDT held for players, deposits today,
+      withdrawals waiting and paid, house earnings by kind and period);
+      alerts (a withdrawal waiting over 24 hours, balances not adding up, a
+      failed settlement, a chain reader unreachable).
+- [ ] **Player search** by name, email, ID, wallet address or TxID.
+- [ ] **Player page:** balances, saved wallets, deposits, withdrawals,
+      matches, the full ledger, signup date, last seen, admin notes.
+- [ ] **Player actions,** each with a required reason in the audit log:
+      adjust a balance (replaces `pnpm balance` for daily use), suspend
+      (cannot log in), freeze USDT (can play RAC, cannot stake or withdraw
+      USDT), release a saved wallet, set a temporary password, rename.
+- [ ] **Log out everywhere:** a token version on the user, checked on every
+      request, so a suspension or password reset ends live sessions.
+
+##### D2: Money safety (about 4 days)
+
+- [ ] **Withdrawal "processing" step:** an admin claims a request before
+      sending, so two admins can never both pay it on-chain. Only the
+      claiming admin can mark it paid; a claim can be released.
+- [ ] **On-chain payout check:** Mark paid reads the TxID from the chain and
+      accepts it only if it sent the payout amount of real USDT to the
+      player's address. Uses the Part B readers.
+- [ ] **Deposit list and search,** and **manual credit** for problem
+      deposits (under 3 USDT, sent from an unsaved wallet). It records the
+      TxID in `deposits`, so it can never be credited twice.
+- [ ] **Failed deposit attempts log,** so support can see what a player
+      tried and repeated failures stand out.
+- [ ] **Daily reconciliation:** USDT balances (available + locked) plus
+      house earnings must equal deposits credited − withdrawals paid ±
+      adjustments − house sweeps. A mismatch raises a dashboard alert.
+- [ ] **Solvency check:** read the receiving wallets' real USDT balance on
+      each chain and compare it with what players hold.
+- [ ] **House sweep record:** log when earnings are taken out, so the
+      reconciliation stays right.
+- [ ] **Backups before every upgrade,** now a hard rule rather than advice,
+      with the last backup time on the dashboard.
+
+##### D3: Game control (about 2–3 days)
+
+- [ ] **Kill switches,** instant and without a restart: USDT rooms, and
+      deposits and withdrawals per network.
+- [ ] **Maintenance mode:** no new matches; running ones finish.
+- [ ] **Announcement banner** on every page.
+- [ ] **Live matches and the queue,** with player names.
+- [ ] **Void a match:** refund both stakes in full, with a reason.
+- [ ] Match search and a round-by-round view.
+
+##### D4: Risk (about 3–4 days)
+
+- [ ] **Login IP log,** and the privacy page says so.
+- [ ] **Multi-account flags:** the same IP or wallet on several accounts.
+- [ ] **Collusion flags:** the same two players meeting again and again in
+      USDT, one usually losing (chip dumping).
+- [ ] **Withdrawal limits:** a daily limit per player, and a second admin's
+      approval above the large-withdrawal amount.
+- [ ] Unusual win-rate flags.
+
+##### D5: Moderation and reports (about 3 days)
+
+- [ ] **Report a chat message:** stored only when reported, with the lines
+      around it.
+- [ ] **Reports queue** with warn, mute chat for a time, and ban.
+- [ ] **CSV exports** of deposits, withdrawals and earnings for accounting.
+- [ ] Version, schema version and uptime on the dashboard.
 
 ### 4.3 A second game
 
