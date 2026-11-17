@@ -12,6 +12,7 @@ const TABLES = [
   "house_ledger",
   "deposit_wallets",
   "deposits",
+  "withdrawals",
 ];
 
 function tableNames(db: DatabaseSync) {

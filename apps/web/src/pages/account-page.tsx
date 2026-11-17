@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { TopUpDialog, UsdtMark } from "@/components/wallet/top-up-dialog";
+import { WithdrawPanel } from "@/components/wallet/withdraw-panel";
 import { depositOverviewRequest, matchHistoryRequest } from "@/lib/api";
 import { useSessionStore } from "@/stores/session-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -195,6 +196,13 @@ export function AccountPage() {
           </div>
           <DepositHistory overview={deposits} />
         </section>
+
+        <WithdrawPanel
+          available={wallets.find((wallet) => wallet.currency === "usdt")?.available ?? 0}
+          overview={deposits}
+          onOpenTopUp={() => setTopUp(true)}
+          onChanged={refreshSession}
+        />
 
         <section className="mt-4 rounded-3xl border border-border bg-card p-6">
           <h2 className="text-sm font-semibold tracking-[0.16em] text-muted-foreground">MATCH HISTORY</h2>

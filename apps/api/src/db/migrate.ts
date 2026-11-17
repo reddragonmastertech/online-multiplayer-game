@@ -140,6 +140,34 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX deposits_user ON deposits (user_id, created_at)`,
     ],
   },
+  {
+    // USDT withdrawals, approved by hand. `is_admin` is set from the command
+    // line only. A payout transaction can settle one request only.
+    version: 4,
+    name: "usdt withdrawals",
+    statements: [
+      `ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`,
+      `CREATE TABLE withdrawals (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users (id),
+        network TEXT NOT NULL,
+        address TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        fee INTEGER NOT NULL,
+        payout INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        payout_tx_id TEXT,
+        note TEXT,
+        decided_by TEXT REFERENCES users (id),
+        created_at TEXT NOT NULL,
+        decided_at TEXT
+      )`,
+      `CREATE INDEX withdrawals_user ON withdrawals (user_id, created_at)`,
+      `CREATE INDEX withdrawals_status ON withdrawals (status, created_at)`,
+      `CREATE UNIQUE INDEX withdrawals_payout_tx_unique ON withdrawals (network, payout_tx_id)
+       WHERE payout_tx_id IS NOT NULL`,
+    ],
+  },
 ];
 
 export function schemaVersion(client: SqliteClient) {

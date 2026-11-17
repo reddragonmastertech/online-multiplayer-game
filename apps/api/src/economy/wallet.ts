@@ -23,6 +23,10 @@ export const ledgerKind = {
   adjustment: "adjustment",
   /** An on-chain USDT deposit, after the 1% fee. */
   deposit: "deposit",
+  /** A withdrawal request: the amount moves from available to locked. */
+  withdrawalLock: "withdrawal_lock",
+  /** A rejected withdrawal: the locked amount comes back. */
+  withdrawalRefund: "withdrawal_refund",
 } as const;
 
 export type LedgerKind = (typeof ledgerKind)[keyof typeof ledgerKind];
@@ -329,6 +333,77 @@ export function creditDeposit(
       "INSERT INTO house_ledger (id, currency, kind, amount, match_id, created_at) VALUES (?, 'usdt', 'deposit_fee', ?, NULL, ?)",
     ).run(randomUUID(), params.fee, params.now);
   }
+}
+
+/*
+ * Withdrawals. A request moves the amount from available to locked, so it can
+ * neither be staked nor requested twice. Paying it removes it from locked for
+ * good (it has left on-chain) and books the fee to the house; rejecting it
+ * puts it back in available. Each of these must run inside the transaction
+ * that changes the withdrawal row, so the money and the status move together.
+ */
+
+/** Locks `amount` USDT for a withdrawal. Returns false if it is not available. */
+export function lockWithdrawal(db: AppDatabase, params: { userId: string; amount: number; now: string }) {
+  const updated = db
+    .prepare(
+      `UPDATE wallets SET available = available - ?, locked = locked + ?
+       WHERE user_id = ? AND currency = 'usdt' AND available >= ?`,
+    )
+    .run(params.amount, params.amount, params.userId, params.amount);
+  if (Number(updated.changes) !== 1) return false;
+
+  writeLedger(db, {
+    userId: params.userId,
+    currency: "usdt",
+    kind: ledgerKind.withdrawalLock,
+    amount: -params.amount,
+    matchId: null,
+    createdAt: params.now,
+  });
+  return true;
+}
+
+/** The USDT has been sent: drop it from locked and book the fee. */
+export function completeWithdrawal(
+  db: AppDatabase,
+  params: { userId: string; withdrawalId: string; amount: number; fee: number; now: string },
+) {
+  const updated = db
+    .prepare("UPDATE wallets SET locked = locked - ? WHERE user_id = ? AND currency = 'usdt' AND locked >= ?")
+    .run(params.amount, params.userId, params.amount);
+  if (Number(updated.changes) !== 1) {
+    throw new Error(`cannot complete withdrawal ${params.withdrawalId}: the amount is not locked`);
+  }
+  if (params.fee > 0) {
+    db.prepare(
+      "INSERT INTO house_ledger (id, currency, kind, amount, match_id, created_at) VALUES (?, 'usdt', 'withdrawal_fee', ?, NULL, ?)",
+    ).run(randomUUID(), params.fee, params.now);
+  }
+}
+
+/** The request was rejected: the locked amount goes back to available, in full. */
+export function returnWithdrawal(
+  db: AppDatabase,
+  params: { userId: string; withdrawalId: string; amount: number; now: string },
+) {
+  const updated = db
+    .prepare(
+      `UPDATE wallets SET available = available + ?, locked = locked - ?
+       WHERE user_id = ? AND currency = 'usdt' AND locked >= ?`,
+    )
+    .run(params.amount, params.amount, params.userId, params.amount);
+  if (Number(updated.changes) !== 1) {
+    throw new Error(`cannot return withdrawal ${params.withdrawalId}: the amount is not locked`);
+  }
+  writeLedger(db, {
+    userId: params.userId,
+    currency: "usdt",
+    kind: ledgerKind.withdrawalRefund,
+    amount: params.amount,
+    matchId: null,
+    createdAt: params.now,
+  });
 }
 
 /** Everything the house has earned in one currency, in smallest units. */

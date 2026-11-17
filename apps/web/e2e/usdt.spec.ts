@@ -241,3 +241,90 @@ test("a USDT deposit is checked on the chain and credited minus 1%", async ({ pa
   await page.getByRole("radio", { name: /^USDT/ }).click();
   await expect(page.getByRole("button", { name: "JOIN NOW" })).toBeEnabled();
 });
+
+/** Gives an account admin rights, the way `pnpm admin` does. */
+function makeAdmin(name: string) {
+  const db = new DatabaseSync(e2eDatabase);
+  try {
+    db.prepare("UPDATE users SET is_admin = 1 WHERE name = ?").run(name);
+  } finally {
+    db.close();
+  }
+}
+
+test("a withdrawal is locked, then paid or rejected by an admin", async ({ browser }) => {
+  const stamp = Date.now();
+  const playerName = `Wes${stamp}`;
+  const adminName = `Adm${stamp}`;
+  const wallet = tronAddress((stamp + 7).toString(16).padStart(40, "0"));
+  const playerCtx = await browser.newContext();
+  const adminCtx = await browser.newContext();
+  const player = await playerCtx.newPage();
+  const admin = await adminCtx.newPage();
+
+  await signUp(player, playerName);
+  await signUp(admin, adminName);
+  creditUsdt(playerName, 25_000_000);
+  makeAdmin(adminName);
+
+  // Withdrawals go to the wallet saved for deposits, so save one first.
+  await player.goto("/account");
+  await expect(player.getByRole("link", { name: new RegExp(`${playerName}.*25 USDT`) })).toBeVisible();
+  await player.getByRole("button", { name: "Save a wallet under Top up" }).click();
+  const dialog = player.getByRole("dialog", { name: "Top Up By USDT" });
+  await dialog.getByRole("tab", { name: "TRC20" }).click();
+  await dialog.getByLabel(/The TRC20 wallet you will send USDT from/).fill(wallet);
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog.getByText(wallet)).toBeVisible();
+  await dialog.getByRole("button", { name: "Close" }).click();
+
+  // Below the minimum is explained; 15 USDT is locked straight away.
+  const amount = player.getByLabel(/Amount in USDT/);
+  await amount.fill("5");
+  await player.getByRole("button", { name: "Request" }).click();
+  await expect(player.getByRole("alert")).toContainText("The minimum withdrawal is 10 USDT.");
+  await amount.fill("15");
+  await expect(player.getByText("Fee 0.15 USDT (1%) · You receive 14.85 USDT")).toBeVisible();
+  await player.getByRole("button", { name: "Request" }).click();
+  await expect(player.getByRole("list", { name: "Withdrawals" })).toContainText("Waiting for approval");
+  await expect(player.getByRole("link", { name: new RegExp(`${playerName}.*10 USDT`) })).toBeVisible();
+  await expect(player.getByText("Available 10 USDT · Locked 15 USDT")).toBeVisible();
+
+  // The admin sees exactly what to send, sends it, and marks it paid.
+  await admin.reload();
+  await admin.getByRole("link", { name: "Admin" }).click();
+  const row = admin.getByRole("listitem", { name: `Withdrawal for ${playerName}` });
+  await expect(row).toContainText("Send exactly 14.85 USDT on Tron (TRC20) to:");
+  await expect(row).toContainText(wallet);
+  await row.getByLabel("After sending, paste your transaction ID").fill((stamp + 1).toString(16).padStart(64, "0"));
+  await row.getByRole("button", { name: "Mark paid" }).click();
+  await expect(row).toHaveCount(0);
+  await expect(admin.getByRole("list", { name: "Decided withdrawals" })).toContainText(playerName);
+
+  await player.reload();
+  await expect(player.getByRole("list", { name: "Withdrawals" })).toContainText("Paid");
+  await expect(player.getByText("Available 10 USDT · Locked 0 USDT")).toBeVisible();
+
+  // A second request, rejected: the full amount comes back.
+  await player.getByLabel(/Amount in USDT/).fill("10");
+  await player.getByRole("button", { name: "Request" }).click();
+  await expect(player.getByText("Available 0 USDT · Locked 10 USDT")).toBeVisible();
+
+  await admin.getByRole("button", { name: "Refresh" }).click();
+  const second = admin.getByRole("listitem", { name: `Withdrawal for ${playerName}` });
+  await second.getByLabel("Or reject it").fill("Please contact support first");
+  await second.getByRole("button", { name: "Reject" }).click();
+  await expect(second).toHaveCount(0);
+
+  await player.reload();
+  await expect(player.getByRole("list", { name: "Withdrawals" })).toContainText("Rejected");
+  await expect(player.getByRole("list", { name: "Withdrawals" })).toContainText("Please contact support first");
+  await expect(player.getByText("Available 10 USDT · Locked 0 USDT")).toBeVisible();
+
+  // A player cannot open the admin page.
+  await player.goto("/admin");
+  await expect(player.getByText("This page is for admins only.")).toBeVisible();
+
+  await playerCtx.close();
+  await adminCtx.close();
+});

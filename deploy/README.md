@@ -66,6 +66,17 @@ Optional:
    wallet you saved under **Account → Top up**, paste the TxID, and check the
    balance. Claiming the same TxID again must be refused.
 
+### Handling withdrawals
+
+1. Make yourself an admin, once:
+   `pnpm --filter @game-platform/api admin -- "<your display name>" on`.
+   Reload the site; an **Admin** link appears in the header.
+2. `/admin` lists waiting requests with the exact amount, network and address.
+   Send that amount from your own wallet, paste the transaction ID, and press
+   **Mark paid**. Or give a reason and **Reject**: the player gets the full
+   amount back.
+3. On ERC20 the gas you pay can be more than the 1% fee on a small request.
+
 Never set `DEPOSIT_CHAIN_FAKE_FILE` here. It is for the browser tests, and
 the server refuses to start with it in production.
 
@@ -221,8 +232,8 @@ restore the backup, then check out the old version.
 
 ## What is deliberately missing
 
-USDT rooms and deposits are real money. There is no withdrawal path yet: money
-only goes out by hand with `pnpm balance`. Back up `game.db` before any hand
-correction. There is no email verification, no password reset, and no
+USDT rooms, deposits and withdrawals are real money. Withdrawals are sent by
+hand: nothing here holds a private key. Back up `game.db` before any hand
+correction with `pnpm balance`. There is no email verification, no password reset, and no
 moderation tooling. Treat the deployment as a test among people you know, not a
 public launch.

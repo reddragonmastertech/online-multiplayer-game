@@ -34,6 +34,8 @@ export const errorCodeSchema = z.enum([
   "deposit_rejected",
   "already_claimed",
   "wallet_taken",
+  "forbidden",
+  "withdrawal_pending",
 ]);
 export type ErrorCode = z.infer<typeof errorCodeSchema>;
 

@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ArenaFrame } from "@/components/layout/arena-frame";
 import { AccountPage } from "@/pages/account-page";
+import { AdminPage } from "@/pages/admin-page";
 import { AuthEntryPage } from "@/pages/auth-entry-page";
 import { CpuMatchPage } from "@/pages/cpu-match-page";
 import { GameLobbyPage } from "@/pages/game-lobby-page";
@@ -33,6 +34,7 @@ export function App() {
           <Route path="matches/:matchId" element={<GameRoomPage />} />
           <Route path="vs/:stakeId" element={<CpuMatchPage />} />
           <Route path="account" element={<AccountPage />} />
+          <Route path="admin" element={<AdminPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

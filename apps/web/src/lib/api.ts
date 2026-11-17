@@ -1,5 +1,6 @@
 import {
   apiPaths,
+  type AdminWithdrawalList,
   type AuthSuccess,
   type DepositClaim,
   type DepositClaimResponse,
@@ -10,6 +11,10 @@ import {
   type MatchHistoryResponse,
   type MeResponse,
   type SignupRequest,
+  type WithdrawalDecision,
+  type WithdrawalList,
+  type WithdrawalRecord,
+  type WithdrawalRequest,
 } from "@game-platform/shared";
 
 export const TOKEN_STORAGE_KEY = "arena.accessToken";
@@ -110,4 +115,26 @@ export function claimDepositRequest(body: DepositClaim) {
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+export function withdrawalsRequest() {
+  return request<WithdrawalList>(apiPaths.withdrawals);
+}
+
+export function requestWithdrawal(body: WithdrawalRequest) {
+  return request<{ withdrawal: WithdrawalRecord }>(apiPaths.withdrawals, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function adminWithdrawalsRequest() {
+  return request<AdminWithdrawalList>(apiPaths.adminWithdrawals);
+}
+
+export function decideWithdrawal(id: string, body: WithdrawalDecision) {
+  return request<{ withdrawal: WithdrawalRecord }>(
+    apiPaths.adminWithdrawalDecision.replace(":id", encodeURIComponent(id)),
+    { method: "POST", body: JSON.stringify(body) },
+  );
 }

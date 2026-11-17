@@ -10,8 +10,8 @@ added without rewriting navigation, matchmaking or the wallet.
 
 > **RAC and USDT are separate balances that never convert.** RAC is free and
 > has no cash value. USDT rooms are played for real money, with a 10% house cut
-> of the pot. USDT comes in through on-chain deposits (TRC20, BEP20, ERC20).
-> Withdrawals are not built yet ([Roadmap 4.2](docs/Roadmap.md)).
+> of the pot. USDT comes in through on-chain deposits (TRC20, BEP20, ERC20)
+> and goes out through withdrawals that an admin sends by hand.
 
 ---
 
@@ -57,6 +57,7 @@ Builds the site and serves everything — pages, API and websockets — from
 | `pnpm test` | Unit tests (engine, queue, wallet, server) |
 | `pnpm build` | Build everything |
 | `pnpm --filter @game-platform/api balance -- "<name>" [rac\|usdt <amount>]` | Show a player's balances, or correct one by hand (writes an `adjustment` ledger row) |
+| `pnpm --filter @game-platform/api admin -- "<name>" on` | Make a player an admin (`off` to undo; no name lists them). Admins handle withdrawals at `/admin` |
 
 From `apps/web`:
 
@@ -166,9 +167,8 @@ from button press to payout.
 
 ## What this is not
 
-- **No USDT withdrawals yet.** Deposits work; money only goes out by hand
-  (`pnpm --filter @game-platform/api balance`). Hand-approved withdrawals are
-  Roadmap 4.2 part C.
+- **No automatic payouts.** Every USDT withdrawal is sent by an admin from
+  their own wallet; the server never holds a private key.
 - **No email verification, password reset, or moderation tools.**
 - **Not multi-instance.** See the hosting note above.
 - Chess and 4×4 appear in the catalog as `Coming soon` and are not playable.

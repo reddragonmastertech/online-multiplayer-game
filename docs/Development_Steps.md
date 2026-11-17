@@ -322,6 +322,30 @@ on the chain before crediting amount − 1%.
 - **No QR code** in the dialog: it would need a new library and the
   screenshots have none.
 
+### Roadmap 4.2 part C — USDT withdrawals, approved by hand
+
+The player asks; an admin sends the USDT from their own wallet and marks it
+paid, or rejects it. The server never holds a key.
+
+- **One wallet per network, both ways.** The payout goes to the wallet the
+  player saved for deposits. That wallet is already tied to one account, so
+  there is no second address to verify or to be tricked into changing.
+- **The amount is locked when asked,** in the same transaction as the
+  request, so it cannot be staked or asked for twice. Minimum 10 USDT, 1% fee
+  taken from the amount (a 10 USDT request pays out 9.9). One waiting request
+  per player keeps the admin list readable.
+- **Paid** drops the amount from `locked` and books the fee to
+  `house_ledger`; **rejected** returns the whole amount to `available` with a
+  ledger row, and the player sees the reason. Only a pending request can be
+  decided, and the status check is inside the UPDATE, so two admins cannot
+  both decide one. A payout TxID can settle one request only.
+- **Admins are made from the command line** (`pnpm admin`), never through the
+  API, and `is_admin` is read from the database on every admin call, so
+  taking it away works at once. `/admin` lists what is waiting with the exact
+  amount, network and address to send to.
+- **The ERC20 gas cost is the house's.** The admin pays gas when sending; a
+  1% fee on a 10 USDT ERC20 withdrawal (0.1 USDT) will not cover it.
+
 ---
 
 ## Deliberately not built
@@ -332,7 +356,7 @@ on the chain before crediting amount − 1%.
 | Redis | One process; the queue is in memory |
 | Supabase | Our own JWT is enough |
 | Postgres | Would need Docker for no gain yet |
-| USDT withdrawals | Rooms and deposits work; hand-approved withdrawals are Roadmap 4.2 part C |
+| Automatic USDT payouts | Withdrawals are sent by hand by an admin; the server never holds a key |
 | A second API instance | Would split the queue |
 | Email verification, password reset | Testers use email + password |
 | Chat reporting and moderation | Mute exists; there is nowhere to send a report |

@@ -16,6 +16,8 @@ import type { ChainClient } from "./deposits/chain";
 import { createChainClient, createFileChainClient } from "./deposits/client";
 import { registerDepositRoutes } from "./deposits/routes";
 import { createDepositService } from "./deposits/service";
+import { registerWithdrawalRoutes } from "./withdrawals/routes";
+import { createWithdrawalService } from "./withdrawals/service";
 import { registerGames } from "./games/register";
 import { registerWebApp } from "./http/web";
 import { registerMatchGateway } from "./match/gateway";
@@ -57,6 +59,7 @@ export async function buildServer(config: AppConfig, overrides: { chain?: ChainC
       : createChainClient(depositConfig.chain));
   const deposits = createDepositService({ db, chain, addresses: depositConfig.addresses });
   await registerDepositRoutes(app, { service: deposits, jwtSecret: config.jwtSecret });
+  registerWithdrawalRoutes(app, { service: createWithdrawalService({ db }), jwtSecret: config.jwtSecret });
   if (depositConfig.fakeChainFile) {
     app.log.warn({ file: depositConfig.fakeChainFile }, "deposits read from a test file, not a real chain");
   }

@@ -277,25 +277,29 @@ one real deposit of at least 3 USDT.
 
 The server never holds a private key and never sends money by itself.
 
-- [ ] **Request:** the user asks to withdraw an amount to their saved wallet
-      for a network. The amount moves from the balance to `locked` straight
-      away, so it cannot be staked while waiting.
-- [ ] **Admin list:** pending requests with the user, amount, network and
+- [x] **Request:** the user asks to withdraw an amount to their saved wallet
+      for a network (the same wallet saved for deposits). The amount moves
+      from the balance to `locked` straight away, so it cannot be staked while
+      waiting. One waiting request per player.
+- [x] **Admin list:** pending requests with the user, amount, network and
       address. The admin sends the USDT from their own wallet, pastes the TxID
       and marks the request **paid**, or **rejects** it, which unlocks the
       amount back to the balance.
-- [ ] **Admin access:** an `is_admin` flag on the user, set from the command
-      line, never through the API. Every admin action is logged with who did
-      it.
-- [ ] **Migration 4:** `withdrawals` (user, amount, network, address, status
+- [x] **Admin access:** an `is_admin` flag on the user, set from the command
+      line (`pnpm --filter @game-platform/api admin -- "<name>" on`), never
+      through the API, and read from the database on every admin call. Every
+      decision records who made it and is logged. The page is `/admin`.
+- [x] **Migration 4:** `withdrawals` (user, amount, network, address, status
       `pending` → `paid` / `rejected`, payout TxID, admin, times).
-- [ ] The user sees each request's status in their wallet history.
+- [x] The user sees each request's status in their wallet history, with the
+      payout TxID or the rejection reason.
 - [x] Withdrawal rules decided: **minimum 10 USDT, fee 1%**. The fee is taken
       from the amount requested, so a 10 USDT request locks 10 and pays out
       9.9.
 
 **Done when** a request goes pending → paid with the balance right at every
-step, and a rejected request returns the full amount.
+step, and a rejected request returns the full amount. **Done:**
+`withdrawals/service.test.ts` and `e2e/usdt.spec.ts` check both paths.
 
 #### Part D: running real money
 
@@ -304,7 +308,8 @@ step, and a rejected request returns the full amount.
 - [ ] **Daily reconciliation:** the sum of USDT balances (including locked)
       must equal deposits credited − withdrawals paid − house cuts. A mismatch
       is logged as an error.
-- [ ] **House earnings:** a total of the cuts, so you can see what to sweep.
+- [x] **House earnings:** `pnpm balance` prints the total of match cuts,
+      deposit fees and withdrawal fees in `house_ledger`.
 - [ ] **Backups before every upgrade,** now a hard rule rather than advice.
 - [x] **Legal, before Part B goes live.** The owner has confirmed that it is
       legal where the site operates. Recorded in the build log.

@@ -11,6 +11,8 @@ export const userSchema = z.object({
   name: displayNameSchema,
   email: emailSchema,
   createdAt: isoDateSchema,
+  /** Set from the command line only (`pnpm admin`), never through the API. */
+  isAdmin: z.boolean().optional(),
 });
 export type User = z.infer<typeof userSchema>;
 
@@ -55,4 +57,8 @@ export const apiPaths = {
   deposits: "/api/deposits",
   depositWallets: "/api/deposits/wallets",
   depositClaim: "/api/deposits/claim",
+  withdrawals: "/api/withdrawals",
+  adminWithdrawals: "/api/admin/withdrawals",
+  /** POST `{ action: "paid", txId }` or `{ action: "reject", reason }`. */
+  adminWithdrawalDecision: "/api/admin/withdrawals/:id",
 } as const;
