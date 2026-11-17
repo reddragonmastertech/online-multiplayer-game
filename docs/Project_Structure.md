@@ -128,7 +128,7 @@ src/
 ├── match/            the queue and the live match loop
 ├── http/             error helpers, serving the built site
 ├── games/            registers the game modules
-└── infra/            Sentry; also some unused leftovers
+└── infra/            Sentry error reporting
 ```
 
 ### `server.ts` — the map
@@ -227,11 +227,8 @@ so a mistyped endpoint returns a JSON 404 instead of a web page.
 
 ### `infra/`
 
-`monitoring.ts` initialises Sentry if `SENTRY_DSN` is set.
-
-`redis.ts`, `supabase.ts` and `queue.ts` are **dead code** — leftovers from an
-earlier plan. Nothing imports them. Do not take them as a sign that this uses
-Redis or Supabase; it does not.
+`monitoring.ts` initialises Sentry if `SENTRY_DSN` is set. That is all that
+lives here.
 
 ---
 
@@ -409,8 +406,7 @@ queue, so parallel tests would pair with each other's players.
 
 - **One process only.** The queue and live matches are in memory. A second
   instance means two players never meet.
-- **Some code is dead.** Do not take `apps/api/src/infra/` as a sign that this
-  uses Redis or Supabase. The current list is
+- **Known rough edges are listed in one place:**
   [Known rough edges](Development_Steps.md#known-rough-edges) in the build log.
 - **`pnpm dev` and the tests use different databases.** Accounts you create by
   hand will not appear in test runs. That is intentional.

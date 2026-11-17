@@ -43,7 +43,6 @@ Notes:
   address instead of the caller's and limits everyone as one client.
 - `DATABASE_URL` is resolved from `apps/api`, so `file:./data/game.db` means
   `apps/api/data/game.db`. An absolute path also works.
-- `REDIS_URL` and the `SUPABASE_*` entries stay empty. Nothing reads them yet.
 
 Optional:
 

@@ -117,8 +117,9 @@ pass.
 
 ### 3.2 Retire the dead infra
 
-- [ ] Delete `apps/api/src/infra/redis.ts`, `supabase.ts` and `queue.ts`.
-- [ ] Remove `REDIS_URL` and `SUPABASE_*` from `config.ts` and `.env.example`.
+- [x] Delete `apps/api/src/infra/redis.ts`, `supabase.ts` and `queue.ts`,
+      and their packages (`ioredis`, `bullmq`, `@supabase/supabase-js`).
+- [x] Remove `REDIS_URL` and `SUPABASE_*` from `config.ts` and `.env.example`.
 - [ ] Decide on `docker-compose.yml`: keep it as the documented Postgres escape
       hatch, or delete it. Either way, say which in the README.
 

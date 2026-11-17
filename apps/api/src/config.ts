@@ -5,11 +5,6 @@ const optionalText = z.preprocess(
   z.string().min(1).optional(),
 );
 
-const optionalUrl = z.preprocess(
-  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
-  z.string().url().optional(),
-);
-
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   HOST: z.string().min(1).default("0.0.0.0"),
@@ -33,9 +28,6 @@ const envSchema = z.object({
   SIGNUP_RATE_LIMIT: z.coerce.number().int().positive().default(10),
   /** Login attempts allowed per client IP per minute. */
   LOGIN_RATE_LIMIT: z.coerce.number().int().positive().default(20),
-  REDIS_URL: optionalText,
-  SUPABASE_URL: optionalUrl,
-  SUPABASE_ANON_KEY: optionalText,
   SENTRY_DSN: optionalText,
 });
 
@@ -51,9 +43,6 @@ export type AppConfig = {
   trustProxy: boolean;
   signupRateLimit: number;
   loginRateLimit: number;
-  redisUrl?: string;
-  supabaseUrl?: string;
-  supabaseAnonKey?: string;
   sentryDsn?: string;
 };
 
@@ -79,9 +68,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     trustProxy: parsed.TRUST_PROXY,
     signupRateLimit: parsed.SIGNUP_RATE_LIMIT,
     loginRateLimit: parsed.LOGIN_RATE_LIMIT,
-    redisUrl: parsed.REDIS_URL,
-    supabaseUrl: parsed.SUPABASE_URL,
-    supabaseAnonKey: parsed.SUPABASE_ANON_KEY,
     sentryDsn: parsed.SENTRY_DSN || undefined,
   };
 }

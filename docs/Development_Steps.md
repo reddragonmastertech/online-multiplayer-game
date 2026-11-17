@@ -215,6 +215,10 @@ harder once strangers have accounts:
   "0.1 USDT MATCH" despite the rule that USDT stays hidden. The stakes now come
   from `MATCH_RULES.racStakes`, the same list live play uses, and the e2e suite
   checks both.
+- **The Redis, BullMQ and Supabase leftovers are gone:** the three
+  `infra/` modules, their npm packages, and the `REDIS_URL` / `SUPABASE_*`
+  settings. An old `.env` that still sets them keeps working; the config
+  ignores keys it does not know.
 
 ---
 
@@ -243,9 +247,6 @@ the match code or the socket contracts.
 
 The one list of these. Other docs link here rather than repeating it.
 
-- **`infra/redis.ts`, `infra/supabase.ts`, `infra/queue.ts` are dead.** Nothing
-  imports them. `config.ts` still parses `REDIS_URL` and `SUPABASE_*`, but
-  nothing uses the values.
 - **The game catalog and the game packages disagree.** The lobby offers chess
   and 4×4 (`apps/web/src/lib/catalog.ts`). The stub packages are chess,
   checkers and tic-tac-toe, and there is no 4×4 package.
@@ -264,9 +265,8 @@ order of value:
 
 1. **Publish it** and run the two-device test. Everything else is guesswork
    until real people have played.
-2. **Delete the dead `infra/` modules.** (`components/home/` is done.)
-3. **Match chat** — specified in §5.5 of the UX doc, scoped to the two players.
-4. **A second game.** The structure is ready; it is the real test of whether
+2. **Match chat** — specified in §5.5 of the UX doc, scoped to the two players.
+3. **A second game.** The structure is ready; it is the real test of whether
    the match shell is as game-agnostic as intended.
-5. **Leaderboards**, once there are enough matches for a ranking to mean
+4. **Leaderboards**, once there are enough matches for a ranking to mean
    anything.

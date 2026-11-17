@@ -23,11 +23,8 @@
     "@game-platform/game-tic-tac-toe": "workspace:*",
     "@game-platform/shared": "workspace:*",
     "@sentry/node": "^11.6.0",
-    "@supabase/supabase-js": "^2.117.3",
-    "bullmq": "^6.3.12",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.5",
-    "ioredis": "^6.0.0",
     "postgres": "^3.4.9",
     "socket.io": "^4.8.4",
     "zod": "^4.6.5"

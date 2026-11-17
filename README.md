@@ -92,8 +92,8 @@ host it. Copy `.env.example` to `.env` in the repository root.
 | `LOG_LEVEL` | `info` | |
 | `WEB_DIST` | `apps/web/dist` | Where the built site is read from |
 
-`REDIS_URL` and `SUPABASE_*` are in the example file and the config parses
-them, but nothing uses the values. Leave them empty.
+`SENTRY_DSN` (API) and `VITE_SENTRY_DSN` (web) are optional and turn on error
+reporting.
 
 ---
 
