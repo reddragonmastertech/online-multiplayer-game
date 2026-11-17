@@ -187,6 +187,22 @@ would have left the match room behind.
 classes. Artwork colours with no matching token were left alone, as was the
 unrouted `components/home/` legacy code.
 
+### Roadmap phase 1 — before publishing
+
+See [`Roadmap.md`](Roadmap.md). Done before publishing because both would be
+harder once strangers have accounts:
+
+- **The blank legacy routes are gone.** `/play`, `/missions`, `/ranking` and
+  `/wallet` rendered an empty page in an older app shell. They now redirect to
+  the intro page.
+- **Migrations are versioned.** The version is SQLite's `user_version` rather
+  than a table, because it then commits or rolls back with the migration
+  itself. The existing schema became migration 1, all `IF NOT EXISTS`, so every
+  database made by the old migrator adopts it without a change. A database
+  newer than the build refuses to start, which makes rolling back a restore
+  from backup rather than a redeploy. The runbook says so.
+- **The docs match the code again,** and the rough edges are kept in one list.
+
 ---
 
 ## Deliberately not built
@@ -212,11 +228,18 @@ the match code or the socket contracts.
 
 ## Known rough edges
 
+The one list of these. Other docs link here rather than repeating it.
+
 - **`components/home/` is dead code with mock data.** `home-page.tsx` is not
   routed. It still contains fabricated live matches and winners. It should be
-  deleted, carefully: `portrait.tsx` and `lobby-data.ts` are still used.
+  deleted, carefully: `portrait.tsx`, `lobby-data.ts` and `intro-preview.tsx`
+  are still used.
 - **`infra/redis.ts`, `infra/supabase.ts`, `infra/queue.ts` are dead.** Nothing
-  imports them.
+  imports them. `config.ts` still parses `REDIS_URL` and `SUPABASE_*`, but
+  nothing uses the values.
+- **The game catalog and the game packages disagree.** The lobby offers chess
+  and 4×4 (`apps/web/src/lib/catalog.ts`). The stub packages are chess,
+  checkers and tic-tac-toe, and there is no 4×4 package.
 - **The e2e suite showed one unexplained flake** in four runs during step 11 and
   has not reproduced since. Most likely the 10s round clock expiring mid-step
   under load.

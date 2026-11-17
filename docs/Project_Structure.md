@@ -98,8 +98,15 @@ Scissors: who beats whom, scoring, and when someone has won. It is pure — no
 database, no sockets, no clock. That is why it is easy to test
 (`engine.test.ts`) and why the server can trust it.
 
-`chess`, `checkers` and `tic-tac-toe` are **stubs**. They export a manifest so
-the catalog can list them as `Coming soon`. There is no logic in them.
+`chess`, `checkers` and `tic-tac-toe` are **stubs**: a manifest with a name and
+player counts, and no logic. The API registers them in its game registry
+(`apps/api/src/games/register.ts`), which is why they show up in its startup
+log.
+
+They are **not** what the lobby shows. The web catalog is a hand-written list
+in `apps/web/src/lib/catalog.ts`, and it offers RPS, chess and `4 × 4`.
+Checkers and tic-tac-toe appear nowhere in the UI, and no package exists for
+4×4. Lining the two up is [roadmap item 3.3](Roadmap.md).
 
 > Adding a game means writing an engine here and a board component in the web
 > app. The lobby, match room, wallet and matchmaking should not need changes.
@@ -303,9 +310,9 @@ Adding chess means writing `chess-board.tsx` and one line in `game-surface.tsx`.
 > **`components/home/` is legacy.** `chat-room`, `left-rail`, `lobby-main` and
 > `home-header` belong to an old lobby design. `home-page.tsx` is not routed in
 > `app.tsx`, so none of it renders. They still contain mock data — fake live
-> matches, fake winners. Do not copy from them. `portrait.tsx` and
-> `lobby-data.ts` *are* still used, by the player seat and the CPU practice
-> page. The rest is waiting to be deleted.
+> matches, fake winners. Do not copy from them. Three files *are* still used:
+> `portrait.tsx` by the player seat, `lobby-data.ts` by the CPU practice page,
+> and `intro-preview.tsx` by the intro page. The rest is waiting to be deleted.
 
 ### `lib/`
 
@@ -406,8 +413,9 @@ queue, so parallel tests would pair with each other's players.
 
 - **One process only.** The queue and live matches are in memory. A second
   instance means two players never meet.
-- **`components/home/` is dead and full of mock data.** Do not copy from it.
-- **`infra/redis.ts` and `infra/supabase.ts` are dead.** This uses neither.
+- **Some code is dead and some of it holds mock data.** Do not copy from
+  `components/home/` or `apps/api/src/infra/`. The current list is
+  [Known rough edges](Development_Steps.md#known-rough-edges) in the build log.
 - **`pnpm dev` and the tests use different databases.** Accounts you create by
   hand will not appear in test runs. That is intentional.
 - **Port 3001 may serve a stale site.** It serves whatever was last built. In

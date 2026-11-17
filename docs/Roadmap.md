@@ -61,17 +61,18 @@ existing one.
 
 ### 1.3 Correct the docs
 
-- [ ] [`Project_Structure.md`](Project_Structure.md) §3 says the game stubs feed
+- [x] [`Project_Structure.md`](Project_Structure.md) §3 says the game stubs feed
       the catalog. They do not: [`lib/catalog.ts`](../apps/web/src/lib/catalog.ts)
       is written by hand and lists chess and 4×4. Describe what is true.
-- [ ] The docs say that only `portrait.tsx` and `lobby-data.ts` are still used
+- [x] The docs say that only `portrait.tsx` and `lobby-data.ts` are still used
       from `components/home/`. `intro-preview.tsx` is used too, by the intro
       page.
-- [ ] The README says nothing reads `REDIS_URL` / `SUPABASE_*`.
+- [x] The README says nothing reads `REDIS_URL` / `SUPABASE_*`.
       [`config.ts`](../apps/api/src/config.ts) does parse them; nothing uses
       them. This goes away in 3.2.
-- [ ] Keep **one** rough-edges list, in `Development_Steps.md`, and link to it
-      from `Project_Structure.md` §9 and the README instead of repeating it.
+- [x] Keep **one** rough-edges list, in `Development_Steps.md`, and link to it
+      from `Project_Structure.md` §9 instead of repeating it. The README has no
+      copy, only its "What this is not" section, which is about scope.
 
 **Done when** every claim in the three docs matches the code.
 
