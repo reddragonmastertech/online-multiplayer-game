@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { migrateSqlite } from "./migrate";
+import { migrateSqlite, schemaVersion } from "./migrate";
 
 const DEFAULT_SQLITE_PATH = "data/game.db";
 
@@ -16,6 +16,10 @@ export function resolveSqlitePath(databaseUrl?: string) {
   return isAbsolute(filePath) ? filePath : resolve(process.cwd(), filePath);
 }
 
+/**
+ * Opens the SQLite file and migrates it. `migrationsApplied` lists the schema
+ * versions this call ran, empty when the file was already current.
+ */
 export function createDatabase(databaseUrl?: string) {
   const filePath = resolveSqlitePath(databaseUrl);
   mkdirSync(dirname(filePath), { recursive: true });
@@ -23,8 +27,8 @@ export function createDatabase(databaseUrl?: string) {
   const db = new DatabaseSync(filePath);
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA foreign_keys = ON");
-  migrateSqlite(db);
-  return db;
+  const migrationsApplied = migrateSqlite(db);
+  return { db, migrationsApplied, schemaVersion: schemaVersion(db) };
 }
 
 export function withTransaction<T>(db: AppDatabase, work: () => T) {

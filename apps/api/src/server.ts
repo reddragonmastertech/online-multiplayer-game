@@ -25,7 +25,10 @@ export async function buildServer(config: AppConfig) {
     trustProxy: config.trustProxy,
   });
   const registry = createGameRegistry();
-  const db = createDatabase(config.databaseUrl);
+  const { db, migrationsApplied, schemaVersion } = createDatabase(config.databaseUrl);
+  if (migrationsApplied.length > 0) {
+    app.log.info({ applied: migrationsApplied, schemaVersion }, "database migrated");
+  }
 
   registerGames(registry);
 
@@ -81,6 +84,7 @@ export async function buildServer(config: AppConfig) {
     {
       games: registry.list().map((game) => game.id),
       sqlite: resolveSqlitePath(config.databaseUrl),
+      schemaVersion,
       web: web.served ? web.root : "not built; run the web dev server instead",
     },
     "game modules registered",

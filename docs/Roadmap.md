@@ -42,13 +42,19 @@ Small and mechanical. Aim for a day.
 
 ### 1.2 Versioned migrations
 
-- [ ] Add a `schema_version` table, plus a numbered list of migrations in
+- [x] A numbered list of migrations in
       [`apps/api/src/db/migrate.ts`](../apps/api/src/db/migrate.ts). Each one
-      runs once, in order, inside a transaction.
-- [ ] Migration 1 is today's `CREATE TABLE IF NOT EXISTS` set, so existing
+      runs once, in order, inside a transaction. The version lives in SQLite's
+      `PRAGMA user_version` rather than in a table, so it commits or rolls back
+      with the migration.
+- [x] Migration 1 is today's `CREATE TABLE IF NOT EXISTS` set, so existing
       databases adopt it without changes.
-- [ ] Test it: a fresh database and today's database both end at the latest
-      version.
+- [x] Test it: a fresh database and today's database both end at the latest
+      version (`db/migrate.test.ts`). A real legacy `e2e.db` went from 0 to 1
+      with every row intact.
+- [x] A database newer than the build refuses to start, rather than running
+      against columns the code does not know. Startup logs any migrations it
+      applied.
 
 **Done when** adding a column is a new numbered entry, not an edit to an
 existing one.

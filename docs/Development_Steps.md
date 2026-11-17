@@ -217,8 +217,6 @@ the match code or the socket contracts.
   deleted, carefully: `portrait.tsx` and `lobby-data.ts` are still used.
 - **`infra/redis.ts`, `infra/supabase.ts`, `infra/queue.ts` are dead.** Nothing
   imports them.
-- **`db/migrate.ts` is not versioned.** It creates missing tables only.
-  Changing an existing column needs a plan for files already in the wild.
 - **The e2e suite showed one unexplained flake** in four runs during step 11 and
   has not reproduced since. Most likely the 10s round clock expiring mid-step
   under load.

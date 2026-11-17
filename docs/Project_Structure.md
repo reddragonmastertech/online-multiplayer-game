@@ -155,9 +155,11 @@ endpoint that hands out 100 RAC.
 ### `db/`
 
 - `client.ts` — opens the SQLite file, turns on WAL, runs migrations.
-- `migrate.ts` — plain `CREATE TABLE IF NOT EXISTS` statements. Not a
-  versioned migration system; adding a column means editing this and thinking
-  about existing files.
+- `migrate.ts` — a numbered list of migrations. The file records how far it
+  has got in SQLite's `user_version`; each newer migration runs once, in its
+  own transaction. To change the schema, **add** an entry with the next
+  number. Never edit one that has shipped: databases past it will not run it
+  again.
 - `schema.ts` — Drizzle table definitions, used for typing.
 
 Six tables: `users`, `wallets`, `ledger_entries`, `matches`, `match_players`,
@@ -367,6 +369,7 @@ Notice what the browser never does: judge a round, change a score, or move RAC.
 |---|---|---|
 | `packages/games/rps/src/engine.test.ts` | The rules | `pnpm test` |
 | `packages/game-core/src/registry.test.ts` | Game registration | `pnpm test` |
+| `apps/api/src/db/migrate.test.ts` | Fresh, legacy and newer databases; rollback on failure | `pnpm test` |
 | `apps/api/src/economy/wallet.test.ts` | Locking, refunds, ledger | `pnpm test` |
 | `apps/api/src/match/queue.test.ts` | Pairing, no self-pairing | `pnpm test` |
 | `apps/api/src/match/runtime.test.ts` | Clock, hidden hands, settling | `pnpm test` |
@@ -394,7 +397,7 @@ queue, so parallel tests would pair with each other's players.
 | Change the match room layout | `apps/web/src/components/match/match-shell.tsx` |
 | Add a game board | New component + a branch in `game-surface.tsx` |
 | Change colours or fonts | `apps/web/src/index.css` |
-| Add a database table | `apps/api/src/db/migrate.ts` and `schema.ts` |
+| Add a database table or column | A new numbered entry in `apps/api/src/db/migrate.ts`, then `schema.ts` |
 | Change how it is hosted | `deploy/` |
 
 ---
@@ -411,5 +414,6 @@ queue, so parallel tests would pair with each other's players.
   development, use 5173.
 - **The signup rate limit counts per IP.** Everyone behind one router is one
   client. Raise `SIGNUP_RATE_LIMIT` when testing with people on your network.
-- **`db/migrate.ts` is not versioned.** It only creates missing tables. Changing
-  an existing column needs a real plan for files that already exist.
+- **Never edit a shipped migration.** Add a new one. An older build refuses to
+  open a database a newer build has migrated, so roll back by restoring a
+  backup, not by redeploying old code.

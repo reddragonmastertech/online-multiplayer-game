@@ -198,6 +198,12 @@ sudo systemctl restart arena      # or: pm2 restart arena
 
 Players in a match at that moment are refunded, not charged.
 
+If the new version changes the database schema, it migrates the file on start
+and logs `database migrated` with the versions applied. **Take the backup above
+before every upgrade.** Migrations only go forward, and an older build refuses
+to open a file a newer build has migrated. To roll back, stop the service,
+restore the backup, then check out the old version.
+
 ## What is deliberately missing
 
 Nothing here handles real money. RAC is play-only credit with no cash value and
