@@ -95,6 +95,9 @@ host it. Copy `.env.example` to `.env` in the repository root.
 `SENTRY_DSN` (API) and `VITE_SENTRY_DSN` (web) are optional and turn on error
 reporting.
 
+`docker-compose.yml` starts a Postgres and a Redis. It is kept for later; the
+app uses neither today, and you do not need Docker to run it.
+
 ---
 
 ## Hosting

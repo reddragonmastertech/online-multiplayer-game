@@ -120,8 +120,9 @@ pass.
 - [x] Delete `apps/api/src/infra/redis.ts`, `supabase.ts` and `queue.ts`,
       and their packages (`ioredis`, `bullmq`, `@supabase/supabase-js`).
 - [x] Remove `REDIS_URL` and `SUPABASE_*` from `config.ts` and `.env.example`.
-- [ ] Decide on `docker-compose.yml`: keep it as the documented Postgres escape
+- [x] Decide on `docker-compose.yml`: keep it as the documented Postgres escape
       hatch, or delete it. Either way, say which in the README.
+      **Kept as is**, Redis included. The README says the app uses neither.
 
 ### 3.3 Line up the game catalog with the game packages
 
