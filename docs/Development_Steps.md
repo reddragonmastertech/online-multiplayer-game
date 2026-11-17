@@ -429,6 +429,24 @@ player search and a player page with every action.
   rolls the whole void back. It has its own tests.
 - **The e2e suite resets the switches** before and after each control test,
   so one failure cannot leave the arena in maintenance for the next test.
+
+### Roadmap 4.2 part D4 — risk
+
+- **Every signup and login records the IP and browser** (`login_events`,
+  migration 8). With `TRUST_PROXY` on behind the tunnel this is the real
+  client address. The privacy page now says what is kept and why.
+- **Flags, never blocks.** The Risk page lists accounts sharing an IP, pairs
+  who meet again and again in USDT with one winning 80%+ (chip dumping,
+  worst first: a shared IP, then the most money moved, read from the
+  ledger), and players winning 80%+ over 20+ USDT matches, which chance
+  almost never gives in Rock Paper Scissors. Each links to the player; the
+  admin decides. Homes and offices share an IP, so a flag is not proof.
+- **Withdrawal limits:** at most 1000 USDT requested per player in 24 hours
+  (rejected requests do not count), and from 500 USDT a second admin must
+  approve before a different admin may claim and send it. The approval is
+  only required while at least two admins with two-factor can pay, so a
+  single owner is never locked out of their own site. Both limits are
+  `.env` settings; 0 turns one off.
 ---
 
 ## Deliberately not built

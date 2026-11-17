@@ -261,6 +261,28 @@ export const migrations: readonly Migration[] = [
       )`,
     ],
   },
+  {
+    // Risk. Every signup and login records the IP and browser, for
+    // multi-account checks (the privacy page says so). Large withdrawals can
+    // need a second admin's approval before anyone sends them.
+    version: 8,
+    name: "login log and withdrawal approvals",
+    statements: [
+      `CREATE TABLE login_events (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users (id),
+        kind TEXT NOT NULL,
+        ip TEXT NOT NULL,
+        user_agent TEXT,
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX login_events_user ON login_events (user_id, created_at)`,
+      `CREATE INDEX login_events_ip ON login_events (ip, created_at)`,
+      `ALTER TABLE withdrawals ADD COLUMN needs_approval INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE withdrawals ADD COLUMN approved_by TEXT REFERENCES users (id)`,
+      `ALTER TABLE withdrawals ADD COLUMN approved_at TEXT`,
+    ],
+  },
 ];
 
 export function schemaVersion(client: SqliteClient) {

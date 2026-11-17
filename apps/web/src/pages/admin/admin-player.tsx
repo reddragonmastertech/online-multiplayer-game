@@ -183,6 +183,40 @@ export function AdminPlayerPage() {
         </AdminSection>
       ) : null}
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        <AdminSection title="Accounts on the same IP">
+          {player.linkedAccounts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">None.</p>
+          ) : (
+            <>
+              <p className="mb-2 text-xs text-muted-foreground">A reason to look, not proof: homes and offices share an IP.</p>
+              <ul className="space-y-1 text-sm" aria-label="Linked accounts">
+                {player.linkedAccounts.map((account) => (
+                  <li key={account.userId}>
+                    <Link to={`/admin/players/${account.userId}`} className="font-semibold text-primary">
+                      {account.name}
+                    </Link>
+                    {account.status === "suspended" ? <span className="ml-2 text-xs text-danger">suspended</span> : null}
+                    <span className="block text-xs text-muted-foreground">{account.sharedIps.join(", ")}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </AdminSection>
+        <AdminSection title="Recent sign-ins">
+          {player.logins.length === 0 ? <p className="text-sm text-muted-foreground">None recorded.</p> : null}
+          <ul className="space-y-1 text-sm" aria-label="Sign-ins">
+            {player.logins.slice(0, 15).map((login) => (
+              <li key={`${login.createdAt}-${login.ip}`} className="break-all">
+                <span className="text-xs text-muted-foreground">{when(login.createdAt)}</span> {login.kind} from <code>{login.ip}</code>
+                {login.userAgent ? <span className="block text-xs text-muted-foreground">{login.userAgent}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </AdminSection>
+      </div>
+
       <AdminSection title="Saved wallets">
         {player.savedWallets.length === 0 ? (
           <p className="text-sm text-muted-foreground">None.</p>

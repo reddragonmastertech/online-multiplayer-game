@@ -10,6 +10,7 @@ import { AdminLivePage } from "@/pages/admin/admin-live";
 import { AdminMatchPage } from "@/pages/admin/admin-match";
 import { AdminMoneyPage } from "@/pages/admin/admin-money";
 import { AdminPlayerPage } from "@/pages/admin/admin-player";
+import { AdminRiskPage } from "@/pages/admin/admin-risk";
 import { AdminPlayersPage } from "@/pages/admin/admin-players";
 import { AdminWithdrawalsPage } from "@/pages/admin/admin-withdrawals";
 import { AuthEntryPage } from "@/pages/auth-entry-page";
@@ -53,6 +54,7 @@ export function App() {
             <Route path="live" element={<AdminLivePage />} />
             <Route path="matches/:id" element={<AdminMatchPage />} />
             <Route path="control" element={<AdminControlPage />} />
+            <Route path="risk" element={<AdminRiskPage />} />
             <Route path="audit" element={<AdminAuditPage />} />
             <Route path="admins" element={<AdminAdminsPage />} />
           </Route>

@@ -65,7 +65,7 @@ export async function buildServer(config: AppConfig, overrides: { chain?: ChainC
   const deposits = createDepositService({ db, chain, addresses: depositConfig.addresses });
   const auth = { db, jwtSecret: config.jwtSecret };
   await registerDepositRoutes(app, { service: deposits, auth });
-  registerWithdrawalRoutes(app, { service: createWithdrawalService({ db, chain }), auth });
+  registerWithdrawalRoutes(app, { service: createWithdrawalService({ db, chain, limits: config.risk }), auth });
   if (depositConfig.fakeChainFile) {
     app.log.warn({ file: depositConfig.fakeChainFile }, "deposits read from a test file, not a real chain");
   }

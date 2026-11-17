@@ -4,6 +4,7 @@ import {
   type AdminDashboard,
   type AdminDeposit,
   type AdminLive,
+  type RiskReport,
   type AdminMatchDetail,
   type AdminMatchSummary,
   type SiteSettings,
@@ -146,3 +147,6 @@ export const adminMatchRequest = (id: string) =>
   adminRequest<AdminMatchDetail>(apiPaths.adminMatch.replace(":id", encodeURIComponent(id)));
 export const adminVoidMatch = (id: string, reason: string) =>
   adminRequest<AdminMatchDetail>(apiPaths.adminMatchVoid.replace(":id", encodeURIComponent(id)), post({ reason }));
+
+/* D4: risk. */
+export const adminRiskRequest = () => adminRequest<RiskReport>(apiPaths.adminRisk);

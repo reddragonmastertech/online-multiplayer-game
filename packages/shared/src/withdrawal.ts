@@ -65,6 +65,10 @@ export const adminWithdrawalSchema = withdrawalRecordSchema.extend({
   userId: z.string().min(1),
   userName: z.string().min(1),
   decidedBy: z.string().nullable(),
+  /** Large requests need a second admin's approval before anyone may send them. */
+  needsApproval: z.boolean(),
+  approvedById: z.string().nullable(),
+  approvedBy: z.string().nullable(),
   /** The admin who claimed it to send the payout. */
   claimedById: z.string().nullable(),
   claimedBy: z.string().nullable(),
@@ -78,6 +82,8 @@ export const adminWithdrawalListSchema = z.object({
 export type AdminWithdrawalList = z.infer<typeof adminWithdrawalListSchema>;
 
 export const withdrawalDecisionSchema = z.discriminatedUnion("action", [
+  /** A second admin agrees a large request may be sent. */
+  z.object({ action: z.literal("approve") }),
   /** "I am sending this one": no other admin can pay it while claimed. */
   z.object({ action: z.literal("claim") }),
   z.object({ action: z.literal("release") }),

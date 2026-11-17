@@ -49,6 +49,11 @@ function OpenRow({ item, canDecide, isOwner, myId, onChanged }: {
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="font-semibold">{item.userName}</span>
         <span className="text-xs text-muted-foreground">asked {when(item.createdAt)}</span>
+        {item.needsApproval ? (
+          <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[11px] font-semibold text-gold">
+            {item.approvedBy ? `Approved by ${item.approvedBy}` : "Needs a second admin's approval"}
+          </span>
+        ) : null}
         {item.status === "processing" ? (
           <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
             {mine ? "You are sending this" : `Being sent by ${item.claimedBy ?? "another admin"}`}
@@ -75,9 +80,17 @@ function OpenRow({ item, canDecide, isOwner, myId, onChanged }: {
         <p className="mt-3 text-xs text-muted-foreground">Your role can see this request but not decide it.</p>
       ) : item.status === "pending" ? (
         <div className="mt-3 flex flex-wrap items-end gap-2">
-          <Button size="sm" disabled={busy} onClick={() => void run({ action: "claim" })}>
-            Claim and send
-          </Button>
+          {item.needsApproval && !item.approvedById ? (
+            <Button size="sm" disabled={busy} onClick={() => void run({ action: "approve" })}>
+              Approve (large withdrawal)
+            </Button>
+          ) : item.needsApproval && item.approvedById === myId ? (
+            <p className="text-xs text-muted-foreground">You approved it; a different admin sends it.</p>
+          ) : (
+            <Button size="sm" disabled={busy} onClick={() => void run({ action: "claim" })}>
+              Claim and send
+            </Button>
+          )}
           <form onSubmit={(event) => void run({ action: "reject", reason }, event)} className="flex flex-1 items-end gap-2">
             <label className="block min-w-0 flex-1">
               <span className="mb-1 block text-xs text-muted-foreground">Or reject it (the player sees the reason)</span>

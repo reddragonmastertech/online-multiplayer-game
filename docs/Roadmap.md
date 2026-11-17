@@ -394,13 +394,17 @@ the site grows.
 
 ##### D4: Risk (about 3–4 days)
 
-- [ ] **Login IP log,** and the privacy page says so.
-- [ ] **Multi-account flags:** the same IP or wallet on several accounts.
-- [ ] **Collusion flags:** the same two players meeting again and again in
+- [x] **Login IP log,** and the privacy page says so. Every signup and login
+      records the IP and browser; the player page shows recent sign-ins.
+- [x] **Multi-account flags:** accounts on the same IP, on the Risk page and
+      each player page. (A saved wallet already belongs to one account only.)
+- [x] **Collusion flags:** the same two players meeting again and again in
       USDT, one usually losing (chip dumping).
-- [ ] **Withdrawal limits:** a daily limit per player, and a second admin's
-      approval above the large-withdrawal amount.
-- [ ] Unusual win-rate flags.
+- [x] **Withdrawal limits:** a 24-hour limit per player (1000 USDT,
+      `WITHDRAWAL_DAILY_LIMIT`), and a second admin's approval from 500 USDT
+      (`WITHDRAWAL_SECOND_APPROVAL`): one admin approves, a different one
+      sends. Off while only one admin can pay.
+- [x] Unusual win-rate flags (80%+ over 20+ USDT matches in 30 days).
 
 ##### D5: Moderation and reports (about 3 days)
 

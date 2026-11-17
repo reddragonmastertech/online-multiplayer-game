@@ -47,6 +47,10 @@ const envSchema = z.object({
   BACKUP_DIR: optionalText,
   /** How many daily backups to keep. */
   BACKUP_KEEP: z.coerce.number().int().positive().default(14),
+  /** Most USDT one player may request to withdraw in 24 hours, in whole USDT; 0 turns it off. */
+  WITHDRAWAL_DAILY_LIMIT: z.coerce.number().nonnegative().default(1000),
+  /** Requests of at least this many USDT need a second admin's approval; 0 turns it off. */
+  WITHDRAWAL_SECOND_APPROVAL: z.coerce.number().nonnegative().default(500),
 });
 
 export type AppConfig = {
@@ -66,6 +70,8 @@ export type AppConfig = {
   deposits?: DepositConfig;
   /** Leave out to back up next to the database, keeping 14. */
   backup?: { dir?: string; keep: number };
+  /** Withdrawal limits in 0.000001 USDT; 0 means off. Leave out for 1000 a day and approval from 500. */
+  risk?: { withdrawalDailyLimit: number; secondApprovalFrom: number };
 };
 
 export type DepositConfig = {
@@ -131,5 +137,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       fakeChainFile: parsed.DEPOSIT_CHAIN_FAKE_FILE,
     },
     backup: { dir: parsed.BACKUP_DIR, keep: parsed.BACKUP_KEEP },
+    risk: {
+      withdrawalDailyLimit: Math.round(parsed.WITHDRAWAL_DAILY_LIMIT * 1_000_000),
+      secondApprovalFrom: Math.round(parsed.WITHDRAWAL_SECOND_APPROVAL * 1_000_000),
+    },
   };
 }

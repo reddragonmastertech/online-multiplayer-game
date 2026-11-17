@@ -17,6 +17,7 @@ import {
   unauthorized,
 } from "../http/errors";
 import { authenticate, suspended } from "./guard";
+import { recordLogin } from "./login-events";
 import { loadMatchHistory } from "../match/history";
 import { signAccessToken } from "./jwt";
 import { hashPassword, verifyPassword } from "./password";
@@ -106,6 +107,7 @@ export async function registerAuthRoutes(
             "INSERT INTO users (id, name, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
           ).run(user.id, user.name, user.email, user.passwordHash, user.createdAt);
           openWallets(db, user.id, now);
+          recordLogin(db, { userId: user.id, kind: "signup", ip: request.ip, userAgent: request.headers["user-agent"] });
         });
       } catch (error) {
         const column = uniqueConstraintColumn(error);
@@ -146,6 +148,7 @@ export async function registerAuthRoutes(
       if (!account) {
         return sendError(reply, invalidCredentials());
       }
+      recordLogin(db, { userId: user.id, kind: "login", ip: request.ip, userAgent: request.headers["user-agent"] });
 
       return {
         token: signAccessToken(

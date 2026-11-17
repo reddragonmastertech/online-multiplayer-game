@@ -82,4 +82,5 @@ export const apiPaths = {
   adminMatches: "/api/admin/matches",
   adminMatch: "/api/admin/matches/:id",
   adminMatchVoid: "/api/admin/matches/:id/void",
+  adminRisk: "/api/admin/risk",
 } as const;

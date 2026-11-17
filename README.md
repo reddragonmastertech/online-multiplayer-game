@@ -99,6 +99,8 @@ host it. Copy `.env.example` to `.env` in the repository root.
 | `ETH_RPC_URL` / `BSC_RPC_URL` | public nodes | Where deposits are read from. Any JSON-RPC provider URL works |
 | `TRONGRID_URL` / `TRONGRID_API_KEY` | `https://api.trongrid.io` / none | Tron deposits. A free key raises TronGrid's limits |
 | `BACKUP_DIR` / `BACKUP_KEEP` | `backups/` next to the database / `14` | Daily automatic backups |
+| `WITHDRAWAL_DAILY_LIMIT` | `1000` | Most USDT one player may request in 24 hours; 0 turns it off |
+| `WITHDRAWAL_SECOND_APPROVAL` | `500` | From this many USDT a second admin must approve; 0 turns it off |
 
 `SENTRY_DSN` (API) and `VITE_SENTRY_DSN` (web) are optional and turn on error
 reporting.

@@ -8,7 +8,7 @@ const docs: Record<string, { title: string; body: string }> = {
   },
   privacy: {
     title: "Privacy",
-    body: "A privacy policy will ship with accounts. Do not submit real personal data you are not willing to test with.",
+    body: "We keep your email, display name, balances, matches, deposit and withdrawal records, and the wallet addresses you save. Each time you sign up or log in we record your IP address and browser, so admins can spot one person running several accounts and keep paid play fair. Admins see this only to run and protect the site. Match chat is not stored.",
   },
   eligibility: {
     title: "Eligibility",

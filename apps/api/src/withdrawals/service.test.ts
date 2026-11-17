@@ -220,3 +220,66 @@ describe("claiming and paying", () => {
     ]);
   });
 });
+
+describe("limits and second approval", () => {
+  function withLimits(daily: number, approvalFrom: number) {
+    const chain: ChainClient = {
+      lookup: async (_network, txId) => chainAnswers[txId] ?? { status: "not_found" },
+      usdtBalance: async () => 0n,
+      ping: async () => {},
+    };
+    return createWithdrawalService({
+      db,
+      chain,
+      limits: { withdrawalDailyLimit: daily * 1_000_000, secondApprovalFrom: approvalFrom * 1_000_000 },
+    });
+  }
+
+  it("caps what one player can ask for in 24 hours, counting open and paid requests", async () => {
+    adjustBalance(db, { userId: "ann", currency: "usdt", amount: 100_000_000 });
+    const limited = withLimits(30, 0);
+    const first = limited.request("ann", "trc20", 20_000_000);
+    await limited.decide(BOSS, first.id, { action: "reject", reason: "test" });
+    // A rejected request does not count.
+    const second = limited.request("ann", "trc20", 25_000_000);
+    onChain(PAYOUT_TX, 24.75);
+    await limited.decide(BOSS, second.id, { action: "claim" });
+    await limited.decide(BOSS, second.id, { action: "paid", txId: PAYOUT_TX });
+
+    expect(await refusal(() => limited.request("ann", "trc20", 10_000_000))).toMatchObject({
+      message: "You can withdraw up to 30 USDT in 24 hours. You can ask for 5 USDT more right now.",
+    });
+  });
+
+  it("needs a second admin above the threshold: one approves, another sends", async () => {
+    // Both admins have two-factor on, so a second approval is possible.
+    db.prepare("UPDATE users SET totp_enabled = 1 WHERE id IN ('boss', 'fin')").run();
+    const guarded = withLimits(0, 20);
+    const { id } = guarded.request("ann", "trc20", 20_000_000);
+    expect(guarded.adminList()[0]).toMatchObject({ needsApproval: true, approvedBy: null });
+
+    expect(await refusal(() => guarded.decide(BOSS, id, { action: "claim" }))).toMatchObject({
+      message: expect.stringContaining("another admin has to approve it"),
+    });
+    await guarded.decide(FIN, id, { action: "approve" });
+    expect(await refusal(() => guarded.decide(FIN, id, { action: "claim" }))).toMatchObject({
+      message: "You approved this one, so a different admin has to send it.",
+    });
+    expect((await guarded.decide(BOSS, id, { action: "claim" })).status).toBe("processing");
+    expect(guarded.adminList()[0]).toMatchObject({ approvedBy: "fin", claimedBy: "boss" });
+  });
+
+  it("skips the second approval while only one admin can pay", async () => {
+    db.prepare("UPDATE users SET totp_enabled = 1 WHERE id = 'boss'").run();
+    const guarded = withLimits(0, 20);
+    const { id } = guarded.request("ann", "trc20", 20_000_000);
+    expect(guarded.adminList()[0]).toMatchObject({ needsApproval: false });
+    expect((await guarded.decide(BOSS, id, { action: "claim" })).status).toBe("processing");
+  });
+
+  it("leaves small requests alone", () => {
+    db.prepare("UPDATE users SET totp_enabled = 1 WHERE id IN ('boss', 'fin')").run();
+    withLimits(0, 20).request("ann", "trc20", 19_000_000);
+    expect(service.adminList()[0]).toMatchObject({ needsApproval: false });
+  });
+});

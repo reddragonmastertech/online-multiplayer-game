@@ -24,6 +24,7 @@ import { HttpError, invalidInput, notFound } from "../http/errors";
 import { loadMatchHistory } from "../match/history";
 import { readAudit, recordAudit } from "./audit";
 import { lastBackup, reconcileUsdt } from "./books";
+import { linkedAccounts, loginsFor } from "./risk";
 import { generateTotpSecret, totpUri, verifyTotp } from "./totp";
 
 export type AdminActor = { userId: string; name: string; role: AdminRole; ip?: string | null };
@@ -426,6 +427,8 @@ export function createAdminService(deps: { db: AppDatabase; jwtSecret: string; l
       ledger,
       notes,
       audit: readAudit(db, { targetUserId: userId, limit: 100 }),
+      logins: loginsFor(db, userId),
+      linkedAccounts: linkedAccounts(db, userId),
     };
   }
 

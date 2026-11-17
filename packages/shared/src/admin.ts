@@ -168,6 +168,8 @@ export type AdminAuditEntry = {
 };
 
 export type AdminPlayerDetail = AdminPlayerSummary & {
+  logins: { ip: string; userAgent: string | null; kind: "signup" | "login"; createdAt: string }[];
+  linkedAccounts: { userId: string; name: string; sharedIps: string[]; status: AccountStatus }[];
   totpEnabled: boolean;
   wallets: Wallet[];
   savedWallets: { network: DepositNetwork; address: string }[];
@@ -274,4 +276,41 @@ export type AdminMatchDetail = AdminMatchSummary & {
 export type AdminLive = {
   matches: AdminMatchSummary[];
   queue: { userId: string; name: string; currency: Currency; stake: number; queuedAt: string }[];
+};
+
+/* ---------- D4: risk ---------- */
+
+export type LoginEvent = { ip: string; userAgent: string | null; kind: "signup" | "login"; createdAt: string };
+
+/** Another account that has signed in from one of the same IP addresses. */
+export type LinkedAccount = { userId: string; name: string; sharedIps: string[]; status: AccountStatus };
+
+/** Several accounts on one IP address: a flag to look at, not proof (homes and offices share addresses). */
+export type IpCluster = { ip: string; accounts: { userId: string; name: string }[]; lastSeen: string };
+
+/** Two players who meet again and again in USDT, one usually losing (chip dumping). */
+export type CollusionFlag = {
+  winner: { userId: string; name: string };
+  loser: { userId: string; name: string };
+  matches: number;
+  winnerWins: number;
+  /** USDT that moved from the loser to the winner, after the house cut. */
+  netFlow: number;
+  sharedIp: boolean;
+};
+
+/** A win rate that pure chance would rarely give over this many matches. */
+export type WinRateFlag = { userId: string; name: string; matches: number; wins: number; winRate: number };
+
+export type RiskReport = {
+  windowDays: number;
+  ipClusters: IpCluster[];
+  collusion: CollusionFlag[];
+  winRates: WinRateFlag[];
+  thresholds: {
+    collusionMinMatches: number;
+    collusionMinShare: number;
+    winRateMinMatches: number;
+    winRateMinShare: number;
+  };
 };

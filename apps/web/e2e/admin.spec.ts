@@ -57,6 +57,11 @@ test("an owner passes two-factor, adjusts a balance, suspends a player and sees 
   await owner.getByRole("list", { name: "Players" }).getByRole("link", { name: new RegExp(playerName) }).click();
   await expect(owner.getByRole("heading", { name: playerName })).toBeVisible();
 
+  // Sign-ins are logged with the IP, and accounts on the same IP are linked.
+  // Both browsers here sign up from this machine, so they share one.
+  await expect(owner.getByRole("region", { name: "Recent sign-ins" })).toContainText("signup from");
+  await expect(owner.getByRole("region", { name: "Accounts on the same IP" })).toContainText(ownerName);
+
   const adjust = owner.getByRole("form", { name: "Adjust balance" });
   await adjust.getByLabel("Amount (negative takes away)").fill("5");
   await expect(adjust.getByRole("button", { name: "Apply" })).toBeDisabled();
@@ -83,6 +88,12 @@ test("an owner passes two-factor, adjusts a balance, suspends a player and sees 
   await expect(audit).toContainText("Chargeback under review");
   await expect(audit).toContainText("player.balance_adjusted");
   await expect(audit).toContainText("Tournament prize");
+
+  // The risk page lists the shared IP with both accounts on it.
+  await owner.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: "Risk" }).click();
+  const shared = owner.getByRole("list", { name: "Shared IP addresses" });
+  await expect(shared).toContainText(ownerName);
+  await expect(shared).toContainText(playerName);
 
   await ownerCtx.close();
   await playerCtx.close();

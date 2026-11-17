@@ -123,6 +123,7 @@ const tabs = [
   { to: "/admin/withdrawals", label: "Withdrawals", permission: "view" },
   { to: "/admin/live", label: "Live", permission: "view" },
   { to: "/admin/money", label: "Money", permission: "view" },
+  { to: "/admin/risk", label: "Risk", permission: "view" },
   { to: "/admin/control", label: "Control", permission: "view" },
   { to: "/admin/audit", label: "Audit log", permission: "view" },
   { to: "/admin/admins", label: "Admins", permission: "view" },

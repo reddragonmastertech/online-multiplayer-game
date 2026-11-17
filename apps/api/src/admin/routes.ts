@@ -28,6 +28,7 @@ import { checkSolvency, createBackup, houseAvailable, listSweeps, recordSweep, r
 import { recordAudit } from "./audit";
 import type { AdminMatches } from "./matches";
 import { readSiteSettings, writeSiteSettings } from "./settings";
+import { riskReport } from "./risk";
 import type { AdminActor, AdminService } from "./service";
 
 async function respond<T>(reply: FastifyReply, work: () => T | Promise<T>) {
@@ -292,6 +293,13 @@ export function registerControlRoutes(
       const saved = writeSiteSettings(auth.db, actor, next);
       request.log.warn({ adminId: actor.userId, settings: saved }, "site settings changed");
       return saved;
+    }),
+  );
+
+  app.get(apiPaths.adminRisk, async (request, reply) =>
+    respond(reply, () => {
+      authenticateAdmin(request, auth, "view");
+      return riskReport(auth.db);
     }),
   );
 

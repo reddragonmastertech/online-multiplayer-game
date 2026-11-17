@@ -33,12 +33,21 @@ type WithdrawalRow = {
   decided_by: string | null;
   claimed_by: string | null;
   claimed_at: string | null;
+  needs_approval: number;
+  approved_by: string | null;
   created_at: string;
   decided_at: string | null;
 };
 
 const COLUMNS =
-  "w.id, w.user_id, w.network, w.address, w.amount, w.fee, w.payout, w.status, w.payout_tx_id, w.note, w.decided_by, w.claimed_by, w.claimed_at, w.created_at, w.decided_at";
+  "w.id, w.user_id, w.network, w.address, w.amount, w.fee, w.payout, w.status, w.payout_tx_id, w.note, w.decided_by, w.claimed_by, w.claimed_at, w.needs_approval, w.approved_by, w.created_at, w.decided_at";
+
+/** Withdrawal limits in 0.000001 USDT; 0 turns one off. */
+export type WithdrawalLimits = { withdrawalDailyLimit: number; secondApprovalFrom: number };
+export const DEFAULT_WITHDRAWAL_LIMITS: WithdrawalLimits = {
+  withdrawalDailyLimit: 1000 * 1_000_000,
+  secondApprovalFrom: 500 * 1_000_000,
+};
 
 function toRecord(row: WithdrawalRow): WithdrawalRecord {
   return {
@@ -58,9 +67,26 @@ function toRecord(row: WithdrawalRow): WithdrawalRecord {
 
 const conflict = (message: string) => new HttpError(409, "invalid_input", message);
 
-export function createWithdrawalService(deps: { db: AppDatabase; chain: ChainClient; now?: () => string }) {
+export function createWithdrawalService(deps: {
+  db: AppDatabase;
+  chain: ChainClient;
+  limits?: WithdrawalLimits;
+  now?: () => string;
+}) {
   const { db, chain } = deps;
+  const limits = deps.limits ?? DEFAULT_WITHDRAWAL_LIMITS;
   const now = deps.now ?? (() => new Date().toISOString());
+
+  /**
+   * Admins who can pay withdrawals and have two-factor on. A second approval
+   * only means something with at least two of them, so with one it is off.
+   */
+  function payingAdmins() {
+    const row = db
+      .prepare("SELECT COUNT(*) AS n FROM users WHERE role IN ('owner', 'finance') AND totp_enabled = 1 AND status = 'active'")
+      .get() as { n: number };
+    return row.n;
+  }
 
   function list(userId: string): WithdrawalRecord[] {
     const rows = db
@@ -109,6 +135,9 @@ export function createWithdrawalService(deps: { db: AppDatabase; chain: ChainCli
       decided_by: null,
       claimed_by: null,
       claimed_at: null,
+      needs_approval:
+        limits.secondApprovalFrom > 0 && amount >= limits.secondApprovalFrom && payingAdmins() >= 2 ? 1 : 0,
+      approved_by: null,
       created_at: now(),
       decided_at: null,
     };
@@ -125,6 +154,26 @@ export function createWithdrawalService(deps: { db: AppDatabase; chain: ChainCli
         );
       }
 
+      if (limits.withdrawalDailyLimit > 0) {
+        // Everything asked for in the last 24 hours that was not rejected.
+        const dayAgo = new Date(new Date(row.created_at).getTime() - 24 * 3600 * 1000).toISOString();
+        const recent = db
+          .prepare(
+            `SELECT COALESCE(SUM(amount), 0) AS total FROM withdrawals
+             WHERE user_id = ? AND status != 'rejected' AND created_at >= ?`,
+          )
+          .get(userId, dayAgo) as { total: number };
+        if (recent.total + amount > limits.withdrawalDailyLimit) {
+          const left = Math.max(0, limits.withdrawalDailyLimit - recent.total);
+          throw new HttpError(
+            400,
+            "invalid_input",
+            `You can withdraw up to ${formatAmount("usdt", limits.withdrawalDailyLimit)} in 24 hours. ` +
+              `You can ask for ${formatAmount("usdt", left)} more right now.`,
+          );
+        }
+      }
+
       if (!lockWithdrawal(db, { userId, amount, now: row.created_at })) {
         throw new HttpError(
           400,
@@ -134,9 +183,9 @@ export function createWithdrawalService(deps: { db: AppDatabase; chain: ChainCli
       }
 
       db.prepare(
-        `INSERT INTO withdrawals (id, user_id, network, address, amount, fee, payout, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
-      ).run(row.id, userId, network, row.address, amount, fee, row.payout, row.created_at);
+        `INSERT INTO withdrawals (id, user_id, network, address, amount, fee, payout, status, needs_approval, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      ).run(row.id, userId, network, row.address, amount, fee, row.payout, row.needs_approval, row.created_at);
     });
 
     return toRecord(row);
@@ -146,17 +195,23 @@ export function createWithdrawalService(deps: { db: AppDatabase; chain: ChainCli
   function adminList(): AdminWithdrawal[] {
     const rows = db
       .prepare(
-        `SELECT ${COLUMNS}, u.name AS user_name, a.name AS admin_name, c.name AS claimer_name
+        `SELECT ${COLUMNS}, u.name AS user_name, a.name AS admin_name, c.name AS claimer_name, ap.name AS approver_name
          FROM withdrawals w
          JOIN users u ON u.id = w.user_id
          LEFT JOIN users a ON a.id = w.decided_by
          LEFT JOIN users c ON c.id = w.claimed_by
+         LEFT JOIN users ap ON ap.id = w.approved_by
          ORDER BY CASE WHEN w.status IN ('pending', 'processing') THEN 0 ELSE 1 END,
                   CASE WHEN w.status IN ('pending', 'processing') THEN w.created_at END ASC,
                   w.decided_at DESC
          LIMIT 200`,
       )
-      .all() as (WithdrawalRow & { user_name: string; admin_name: string | null; claimer_name: string | null })[];
+      .all() as (WithdrawalRow & {
+      user_name: string;
+      admin_name: string | null;
+      claimer_name: string | null;
+      approver_name: string | null;
+    })[];
     return rows.map((row) => ({
       ...toRecord(row),
       userId: row.user_id,
@@ -165,6 +220,9 @@ export function createWithdrawalService(deps: { db: AppDatabase; chain: ChainCli
       claimedById: row.claimed_by,
       claimedBy: row.claimer_name,
       claimedAt: row.claimed_at,
+      needsApproval: row.needs_approval === 1,
+      approvedById: row.approved_by,
+      approvedBy: row.approver_name,
     }));
   }
 
@@ -242,7 +300,30 @@ export function createWithdrawalService(deps: { db: AppDatabase; chain: ChainCli
         now: at,
       });
 
+    if (decision.action === "approve") {
+      withTransaction(db, () => {
+        const updated = db
+          .prepare(
+            `UPDATE withdrawals SET approved_by = ?, approved_at = ?
+             WHERE id = ? AND status = 'pending' AND needs_approval = 1 AND approved_by IS NULL`,
+          )
+          .run(adminId, at, withdrawalId);
+        if (Number(updated.changes) !== 1) {
+          throw conflict(row.needs_approval !== 1 ? "This request does not need an approval." : "It is already approved or decided.");
+        }
+        audit("withdrawal.approved", {});
+      });
+      return toRecord(load(withdrawalId));
+    }
+
     if (decision.action === "claim") {
+      // A large request needs a second admin: one approves, a different one sends.
+      if (row.needs_approval === 1 && !row.approved_by) {
+        throw conflict("This is a large withdrawal: another admin has to approve it before anyone sends it.");
+      }
+      if (row.needs_approval === 1 && row.approved_by === adminId) {
+        throw conflict("You approved this one, so a different admin has to send it.");
+      }
       withTransaction(db, () => {
         const updated = db
           .prepare("UPDATE withdrawals SET status = 'processing', claimed_by = ?, claimed_at = ? WHERE id = ? AND status = 'pending'")

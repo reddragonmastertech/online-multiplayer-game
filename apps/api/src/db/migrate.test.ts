@@ -19,6 +19,7 @@ const TABLES = [
   "house_sweeps",
   "backups",
   "settings",
+  "login_events",
 ];
 
 function tableNames(db: DatabaseSync) {
