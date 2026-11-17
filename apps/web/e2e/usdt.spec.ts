@@ -287,7 +287,25 @@ test("a withdrawal is locked, then paid or rejected by an admin", async ({ brows
   const row = admin.getByRole("listitem", { name: `Withdrawal for ${playerName}` });
   await expect(row).toContainText("Send exactly 14.85 USDT on Tron (TRC20) to:");
   await expect(row).toContainText(wallet);
-  await row.getByLabel("After sending, paste your transaction ID").fill((stamp + 1).toString(16).padStart(64, "0"));
+
+  // Claim first, so no other admin pays it too. The player sees it being sent.
+  await row.getByRole("button", { name: "Claim and send" }).click();
+  await expect(row).toContainText("You are sending this");
+  await player.reload();
+  await expect(player.getByRole("list", { name: "Withdrawals" })).toContainText("Being sent");
+
+  // A payout the chain cannot find is refused, and nothing changes.
+  const payoutTx = (stamp + 1).toString(16).padStart(64, "0");
+  await row.getByLabel("After sending, paste your transaction ID").fill(payoutTx);
+  await row.getByRole("button", { name: "Mark paid" }).click();
+  await expect(row.getByRole("alert")).toContainText("not on the Tron network yet");
+
+  // The admin "sends" 14.85 USDT to the player's wallet; now it is accepted.
+  putOnChain(payoutTx, {
+    status: "mined",
+    confirmations: 5,
+    transfers: [{ contract: USDT_TRC20, from: OUR_TRC20, to: wallet, amount: "14850000" }],
+  });
   await row.getByRole("button", { name: "Mark paid" }).click();
   await expect(row).toHaveCount(0);
   await expect(admin.getByRole("list", { name: "Decided withdrawals" })).toContainText(playerName);

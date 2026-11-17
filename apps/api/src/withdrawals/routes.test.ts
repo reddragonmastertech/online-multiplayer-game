@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { signAccessToken } from "../auth/jwt";
 import { adjustBalance, openWallets } from "../economy/wallet";
+import { USDT_CONTRACTS, type ChainClient } from "../deposits/chain";
 import { buildServer } from "../server";
 
 const SECRET = "withdrawal-routes-secret";
@@ -16,6 +17,23 @@ afterEach(() => {
 async function start() {
   const dir = mkdtempSync(join(tmpdir(), "arena-withdrawals-"));
   dirs.push(dir);
+  // The payout check reads the chain; this fake shows 9.9 USDT reaching Ann.
+  const chain: ChainClient = {
+    usdtBalance: async () => 0n,
+    ping: async () => {},
+    lookup: async () => ({
+      status: "mined",
+      confirmations: 20,
+      transfers: [
+        {
+          contract: USDT_CONTRACTS.bep20.contract,
+          from: "0x9999999999999999999999999999999999999999",
+          to: "0x2222222222222222222222222222222222222222",
+          amount: 9_900_000n * 10n ** 12n,
+        },
+      ],
+    }),
+  };
   const server = await buildServer({
     nodeEnv: "test",
     host: "127.0.0.1",
@@ -28,7 +46,7 @@ async function start() {
     signupRateLimit: 100,
     loginRateLimit: 100,
     webDist: join(dir, "no-such-dist"),
-  });
+  }, { chain });
   for (const [id, role] of [
     ["ann", null],
     ["boss", "owner"],
@@ -91,6 +109,14 @@ describe("withdrawal routes", () => {
 
     const list = (await app.inject({ method: "GET", url: "/api/admin/withdrawals", headers: adminHeaders("boss") })).json();
     expect(list.withdrawals).toEqual([expect.objectContaining({ id, userName: "ann", payout: 9_900_000, status: "pending" })]);
+
+    const claimed = await app.inject({
+      method: "POST",
+      url: `/api/admin/withdrawals/${id}`,
+      headers: adminHeaders("boss"),
+      payload: { action: "claim" },
+    });
+    expect(claimed.json().withdrawal.status).toBe("processing");
 
     const paid = await app.inject({
       method: "POST",

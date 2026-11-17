@@ -340,8 +340,8 @@ the site grows.
       RAC and USDT volume); money (USDT held for players, deposits today,
       withdrawals waiting and paid, house earnings by kind and period);
       alerts (a withdrawal waiting over 24 hours, balances not adding up, a
-      failed settlement, a chain reader unreachable). **Not yet:** the chain reader
-      alert; it needs the D2 health checks.
+      failed settlement, a chain reader unreachable). The chain reader status is
+      on the Money page (each network's wallet read live).
 - [x] **Player search** by name, email, ID, wallet address or TxID.
 - [x] **Player page:** balances, saved wallets, deposits, withdrawals,
       matches, the full ledger, signup date, last seen, admin notes.
@@ -355,26 +355,30 @@ the site grows.
 
 ##### D2: Money safety (about 4 days)
 
-- [ ] **Withdrawal "processing" step:** an admin claims a request before
+- [x] **Withdrawal "processing" step:** an admin claims a request before
       sending, so two admins can never both pay it on-chain. Only the
       claiming admin can mark it paid; a claim can be released.
-- [ ] **On-chain payout check:** Mark paid reads the TxID from the chain and
+- [x] **On-chain payout check:** Mark paid reads the TxID from the chain and
       accepts it only if it sent the payout amount of real USDT to the
       player's address. Uses the Part B readers.
-- [ ] **Deposit list and search,** and **manual credit** for problem
+- [x] **Deposit list and search,** and **manual credit** for problem
       deposits (under 3 USDT, sent from an unsaved wallet). It records the
       TxID in `deposits`, so it can never be credited twice.
-- [ ] **Failed deposit attempts log,** so support can see what a player
+- [x] **Failed deposit attempts log,** so support can see what a player
       tried and repeated failures stand out.
-- [ ] **Daily reconciliation:** USDT balances (available + locked) plus
-      house earnings must equal deposits credited − withdrawals paid ±
-      adjustments − house sweeps. A mismatch raises a dashboard alert.
-- [ ] **Solvency check:** read the receiving wallets' real USDT balance on
+- [x] **Reconciliation:** USDT balances (available + locked) plus house
+      earnings must equal deposits received + adjustments − payouts sent.
+      Sweeps cancel out (they lower both sides). Checked on every dashboard
+      load and hourly by the server; a mismatch raises an alert and a log
+      error.
+- [x] **Solvency check:** read the receiving wallets' real USDT balance on
       each chain and compare it with what players hold.
-- [ ] **House sweep record:** log when earnings are taken out, so the
+- [x] **House sweep record:** log when earnings are taken out, so the
       reconciliation stays right.
-- [ ] **Backups before every upgrade,** now a hard rule rather than advice,
-      with the last backup time on the dashboard.
+- [x] **Backups:** automatic once a day (`VACUUM INTO`, a consistent copy
+      while the server runs, 14 kept), "Back up now" for owners, and the last
+      backup time on the dashboard with an alert after a day. Still take one
+      before every upgrade.
 
 ##### D3: Game control (about 2–3 days)
 

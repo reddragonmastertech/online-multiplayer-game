@@ -21,6 +21,8 @@ async function start() {
   const dir = mkdtempSync(join(tmpdir(), "arena-deposits-"));
   dirs.push(dir);
   const chain: ChainClient = {
+    usdtBalance: async () => 0n,
+    ping: async () => {},
     async lookup(_network, txId) {
       if (txId !== TX) return { status: "not_found" };
       return {

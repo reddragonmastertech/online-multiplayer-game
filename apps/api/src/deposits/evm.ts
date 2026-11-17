@@ -44,3 +44,14 @@ export async function lookupEvm(rpcUrl: string, txId: string): Promise<ChainLook
   const confirmations = Number(BigInt(head) - BigInt(receipt.blockNumber)) + 1;
   return { status: "mined", confirmations, transfers: transfersFromReceipt(receipt) };
 }
+
+/** ERC-20 `balanceOf(address)`, read with `eth_call`. */
+export async function usdtBalanceEvm(rpcUrl: string, contract: string, address: string) {
+  const data = `0x70a08231${address.toLowerCase().replace(/^0x/, "").padStart(64, "0")}`;
+  const result = await rpc<string>(rpcUrl, "eth_call", [{ to: contract, data }, "latest"]);
+  return BigInt(result && result !== "0x" ? result : "0x0");
+}
+
+export async function pingEvm(rpcUrl: string) {
+  await rpc<string>(rpcUrl, "eth_blockNumber", []);
+}

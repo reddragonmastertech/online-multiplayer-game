@@ -3,6 +3,7 @@ import {
   adminAdjustSchema,
   adminCodeSchema,
   adminFreezeSchema,
+  adminManualDepositSchema,
   adminNoteSchema,
   adminPlayerActions,
   adminReasonSchema,
@@ -10,6 +11,7 @@ import {
   adminRenameSchema,
   adminRoleUpdateSchema,
   adminStatusSchema,
+  adminSweepSchema,
   apiPaths,
   type AdminPlayerAction,
 } from "@game-platform/shared";
@@ -17,6 +19,10 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import type { z } from "zod";
 import { authenticateAdmin, authenticateAdminAccount, type AuthContext } from "../auth/guard";
 import { HttpError, invalidInput, notFound, sendError } from "../http/errors";
+import type { DepositNetwork } from "@game-platform/shared";
+import type { ChainClient } from "../deposits/chain";
+import type { DepositService } from "../deposits/service";
+import { checkSolvency, createBackup, houseAvailable, listSweeps, recordSweep, reconcileUsdt, type BackupSettings } from "./books";
 import type { AdminActor, AdminService } from "./service";
 
 async function respond<T>(reply: FastifyReply, work: () => T | Promise<T>) {
@@ -181,6 +187,74 @@ export async function registerAdminRoutes(
       const input = parse(adminRoleUpdateSchema, request.body);
       service.setRole(actor, input.name, input.role);
       return { ok: true };
+    }),
+  );
+}
+
+/** Roadmap 4.2 part D2: deposits, the books, sweeps and backups. */
+export function registerMoneyRoutes(
+  app: FastifyInstance,
+  deps: {
+    auth: AuthContext;
+    deposits: DepositService;
+    chain: ChainClient;
+    addresses: Partial<Record<DepositNetwork, string>>;
+    backup: BackupSettings;
+  },
+) {
+  const { auth, deposits } = deps;
+
+  app.get<{ Querystring: { q?: string; userId?: string } }>(apiPaths.adminDeposits, async (request, reply) =>
+    respond(reply, () => {
+      authenticateAdmin(request, auth, "view");
+      const userId = request.query.userId ? String(request.query.userId) : undefined;
+      return {
+        deposits: userId ? [] : deposits.adminList(String(request.query.q ?? "").slice(0, 120)),
+        attempts: deposits.attempts(userId),
+      };
+    }),
+  );
+
+  app.post(apiPaths.adminDepositsManual, async (request, reply) =>
+    respond(reply, async () => {
+      const actor = authenticateAdmin(request, auth, "money.adjust");
+      const input = parse(adminManualDepositSchema, request.body);
+      const deposit = await deposits.manualCredit(actor, input.userId, input.network, input.txId, input.reason);
+      request.log.info({ adminId: actor.userId, userId: input.userId, txId: deposit.txId }, "manual deposit credited");
+      return { deposit };
+    }),
+  );
+
+  app.get(apiPaths.adminSolvency, async (request, reply) =>
+    respond(reply, async () => {
+      authenticateAdmin(request, auth, "view");
+      return {
+        reconciliation: reconcileUsdt(auth.db),
+        solvency: await checkSolvency(auth.db, deps.chain, deps.addresses),
+      };
+    }),
+  );
+
+  app.get(apiPaths.adminSweeps, async (request, reply) =>
+    respond(reply, () => {
+      authenticateAdmin(request, auth, "view");
+      return { available: houseAvailable(auth.db), sweeps: listSweeps(auth.db) };
+    }),
+  );
+
+  app.post(apiPaths.adminSweeps, async (request, reply) =>
+    respond(reply, () => {
+      const actor = authenticateAdmin(request, auth, "money.adjust");
+      const input = parse(adminSweepSchema, request.body);
+      recordSweep(auth.db, actor, input.amount, input.note);
+      return { available: houseAvailable(auth.db), sweeps: listSweeps(auth.db) };
+    }),
+  );
+
+  app.post(apiPaths.adminBackups, async (request, reply) =>
+    respond(reply, () => {
+      const actor = authenticateAdmin(request, auth, "admins.manage");
+      return { backup: createBackup(auth.db, deps.backup, actor.userId) };
     }),
   );
 }

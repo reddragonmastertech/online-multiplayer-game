@@ -185,13 +185,14 @@ endpoint that hands out 100 RAC. It opens a USDT wallet at 0 too.
   again.
 - `schema.ts` — Drizzle table definitions, used for typing.
 
-Twelve tables: `users`, `wallets` (one row per user per currency),
+Fifteen tables: `users`, `wallets` (one row per user per currency),
 `ledger_entries`, `matches` (with the currency), `match_players`,
 `match_rounds`, `house_ledger` (the house's cut of each USDT match and each
 deposit fee, migration 2), `deposit_wallets` and `deposits` (migration 3), `withdrawals`
-(migration 4), and `admin_audit` and `admin_notes` (migration 5, which also
+(migration 4), `admin_audit` and `admin_notes` (migration 5, which also
 added roles, account status, frozen USDT, token versions and two-factor to
-`users`).
+`users`), and `deposit_attempts`, `house_sweeps` and `backups` (migration 6,
+which also added withdrawal claims and manual deposits).
 
 ### `economy/wallet.ts` — the money rules
 
@@ -255,6 +256,7 @@ only way to set it is `pnpm --filter @game-platform/api admin -- "<name>" on`.
 |---|---|
 | `totp.ts` | Two-factor codes (RFC 6238) and setup keys |
 | `audit.ts` | Writes and reads the append-only audit log |
+| `books.ts` | The USDT reconciliation, the on-chain solvency check, house sweeps and backups |
 | `service.ts` | Two-factor sessions, dashboard, search, the player page and every player action |
 | `routes.ts` | `/api/admin/*`; each route names the permission it needs |
 
@@ -401,7 +403,7 @@ The Top Up dialog is `components/wallet/top-up-dialog.tsx`, opened from the
 account page (`/account?topup=usdt`). The withdraw form is
 `components/wallet/withdraw-panel.tsx`. The admin area is `pages/admin/`:
 `admin-layout.tsx` (the two-factor gate and tabs), then one file per tab
-(dashboard, players, player, withdrawals, audit, admins). Admin calls go
+(dashboard, players, player, withdrawals, money, audit, admins). Admin calls go
 through `lib/admin-api.ts`, which holds the admin session in sessionStorage.
 | `utils.ts` | `cn()` for merging Tailwind classes |
 
@@ -462,7 +464,7 @@ Notice what the browser never does: judge a round, change a score, or move money
 | `apps/api/src/economy/amount.test.ts` | Stakes, the 10% cut, formatting and parsing amounts | `pnpm test` |
 | `apps/api/src/deposits/*.test.ts` | Deposit claims against a fake chain, the HTTP routes, receipt parsing and Tron addresses | `pnpm test` |
 | `apps/api/src/withdrawals/*.test.ts` | Locking, paid, rejected, decide-once, admin-only | `pnpm test` |
-| `apps/api/src/admin/*.test.ts` | Two-factor (RFC vectors, replay), roles, actions, suspension, the audit log | `pnpm test` |
+| `apps/api/src/admin/*.test.ts` | Two-factor (RFC vectors, replay), roles, actions, suspension, the audit log, the books, sweeps, backups, manual credit | `pnpm test` |
 | `apps/api/src/match/queue.test.ts` | Pairing, no self-pairing, never across currencies | `pnpm test` |
 | `apps/api/src/match/chat.test.ts` | Chat length, rate limit, history | `pnpm test` |
 | `apps/api/src/match/gateway.test.ts` | Real sockets: chat reaches players, never spectators; USDT stakes checked and locked | `pnpm test` |

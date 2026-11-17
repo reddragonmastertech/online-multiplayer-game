@@ -10,11 +10,14 @@ import {
   type DepositNetwork,
   type DepositOverview,
   type DepositRecord,
+  type AdminDeposit,
+  type AdminDepositAttempt,
 } from "@game-platform/shared";
 import type { AppDatabase } from "../db/client";
 import { withTransaction } from "../db/client";
 import { creditDeposit } from "../economy/wallet";
-import { HttpError, invalidInput } from "../http/errors";
+import { recordAudit } from "../admin/audit";
+import { HttpError, invalidInput, notFound } from "../http/errors";
 import {
   ChainUnavailableError,
   USDT_CONTRACTS,
@@ -158,7 +161,7 @@ export function createDepositService(deps: {
    * that fails; the player can simply try again, for example once it has
    * enough confirmations.
    */
-  async function claim(userId: string, network: DepositNetwork, rawTxId: string): Promise<DepositRecord> {
+  async function claimChecked(userId: string, network: DepositNetwork, rawTxId: string): Promise<DepositRecord> {
     const info = NETWORK_INFO[network];
     const ours = addresses[network];
     if (!ours) {
@@ -276,7 +279,153 @@ export function createDepositService(deps: {
     return toRecord(row);
   }
 
-  return { overview, saveWallet, claim };
+  /**
+   * The player-facing claim. A refused claim is kept in `deposit_attempts`
+   * (never a credited one), so support can see what a player tried and
+   * repeated failures stand out.
+   */
+  async function claim(userId: string, network: DepositNetwork, rawTxId: string): Promise<DepositRecord> {
+    try {
+      return await claimChecked(userId, network, rawTxId);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        db.prepare(
+          "INSERT INTO deposit_attempts (id, user_id, network, tx_id, code, message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        ).run(randomUUID(), userId, network, rawTxId.trim().slice(0, 80), error.code, error.message, now());
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * An admin credits a deposit the normal claim refuses: under the minimum,
+   * or sent from a wallet the player never saved. The chain must still show
+   * real USDT reaching our address with enough confirmations, the amount is
+   * what the chain says (never typed), the usual 1% fee applies, and the
+   * TxID goes into `deposits`, so it can never be credited twice.
+   */
+  async function manualCredit(
+    actor: { userId: string; ip?: string | null },
+    userId: string,
+    network: DepositNetwork,
+    rawTxId: string,
+    reason: string,
+  ): Promise<DepositRecord> {
+    const info = NETWORK_INFO[network];
+    const ours = addresses[network];
+    if (!ours) throw new HttpError(403, "deposit_closed", `${info.label} deposits are not open.`);
+    const player = db.prepare("SELECT id FROM users WHERE id = ?").get(userId);
+    if (!player) throw notFound("That player does not exist.");
+
+    const txId = normalizeTxId(network, rawTxId);
+    if (!txId) throw invalidInput(`That is not a ${info.label} transaction ID.`);
+    if (claimedBy(network, txId)) throw new HttpError(409, "already_claimed", "That transaction has already been credited.");
+
+    let lookup;
+    try {
+      lookup = await chain.lookup(network, txId);
+    } catch (error) {
+      if (error instanceof ChainUnavailableError) throw pending(`We could not reach the ${info.chain} network. Try again in a minute.`);
+      throw error;
+    }
+    if (lookup.status === "not_found") throw pending(`That transaction is not on the ${info.chain} network yet.`);
+    if (lookup.status === "failed") throw rejected("That transaction failed on the chain, so no USDT was sent.");
+
+    const usdt = canonicalAddress(network, USDT_CONTRACTS[network].contract);
+    const toUs = lookup.transfers.filter(
+      (transfer) => transfer.contract === usdt && transfer.to === canonicalAddress(network, ours),
+    );
+    if (toUs.length === 0) throw rejected(`That transaction sent no real USDT to our ${info.label} address.`);
+    if (lookup.confirmations < info.confirmations) {
+      throw pending(`It has ${Math.max(lookup.confirmations, 0)} of ${info.confirmations} confirmations. Try again in a few minutes.`);
+    }
+
+    const amount = toUsdtUnits(network, toUs.reduce((sum, transfer) => sum + transfer.amount, 0n));
+    if (amount <= 0) throw rejected("That transfer is too small to credit.");
+    const fee = depositFee(amount);
+    const row: DepositRow = {
+      id: randomUUID(),
+      network,
+      tx_id: txId,
+      from_address: toUs[0]?.from ?? "unknown",
+      amount,
+      fee,
+      credited: amount - fee,
+      created_at: now(),
+    };
+
+    try {
+      withTransaction(db, () => {
+        db.prepare(
+          `INSERT INTO deposits (id, user_id, network, tx_id, from_address, amount, fee, credited, created_at, manual_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(row.id, userId, network, txId, row.from_address, amount, fee, row.credited, row.created_at, actor.userId);
+        creditDeposit(db, { userId, depositId: row.id, credited: row.credited, fee, now: row.created_at });
+        recordAudit(db, {
+          adminId: actor.userId,
+          action: "deposit.manual_credit",
+          targetUserId: userId,
+          details: { network, txId, amount, credited: row.credited, from: row.from_address, reason },
+          ip: actor.ip,
+          now: row.created_at,
+        });
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
+        throw new HttpError(409, "already_claimed", "That transaction has already been credited.");
+      }
+      throw error;
+    }
+    return toRecord(row);
+  }
+
+  /** Credited deposits for admins, newest first, optionally filtered by TxID, address or player name. */
+  function adminList(query = ""): AdminDeposit[] {
+    const q = query.trim();
+    const rows = db
+      .prepare(
+        `SELECT d.id, d.network, d.tx_id, d.from_address, d.amount, d.fee, d.credited, d.created_at, d.manual_by,
+                d.user_id, u.name AS user_name
+         FROM deposits d JOIN users u ON u.id = d.user_id
+         WHERE ? = '' OR d.tx_id = lower(?) OR lower(d.from_address) = lower(?) OR u.name = ?
+         ORDER BY d.created_at DESC LIMIT 200`,
+      )
+      .all(q, q, q, q) as (DepositRow & { manual_by: string | null; user_id: string; user_name: string })[];
+    return rows.map((row) => ({ ...toRecord(row), userId: row.user_id, userName: row.user_name, manual: row.manual_by !== null }));
+  }
+
+  /** Refused claims, newest first; for one player when `userId` is given. */
+  function attempts(userId?: string): AdminDepositAttempt[] {
+    const rows = db
+      .prepare(
+        `SELECT a.id, a.user_id, u.name AS user_name, a.network, a.tx_id, a.code, a.message, a.created_at
+         FROM deposit_attempts a JOIN users u ON u.id = a.user_id
+         WHERE ? IS NULL OR a.user_id = ?
+         ORDER BY a.created_at DESC LIMIT 100`,
+      )
+      .all(userId ?? null, userId ?? null) as {
+      id: string;
+      user_id: string;
+      user_name: string;
+      network: DepositNetwork;
+      tx_id: string;
+      code: string;
+      message: string;
+      created_at: string;
+    }[];
+    return rows.map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      userName: row.user_name,
+      network: row.network,
+      txId: row.tx_id,
+      code: row.code,
+      message: row.message,
+      createdAt: row.created_at,
+    }));
+  }
+
+  return { overview, saveWallet, claim, manualCredit, adminList, attempts };
 }
 
 export type DepositService = ReturnType<typeof createDepositService>;

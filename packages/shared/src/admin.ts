@@ -125,6 +125,8 @@ export type AdminDashboard = {
     house: { kind: string; today: number; week: number; total: number }[];
   };
   alerts: AdminAlert[];
+  reconciliation: ReconciliationReport;
+  lastBackup: BackupInfo | null;
   generatedAt: string;
 };
 
@@ -176,3 +178,68 @@ export type AdminPlayerDetail = AdminPlayerSummary & {
 };
 
 export type AdminTempPassword = { password: string };
+
+/* ---------- D2: money safety ---------- */
+
+export const adminManualDepositSchema = z.object({
+  userId: z.string().min(1),
+  network: depositNetworkSchema,
+  txId: z.string().trim().min(1).max(80),
+  reason,
+});
+export type AdminManualDeposit = z.infer<typeof adminManualDepositSchema>;
+
+export const adminSweepSchema = z.object({
+  /** In 0.000001 USDT. */
+  amount: z.number().int().positive(),
+  note: z.string().trim().min(3, "Say where it went.").max(200),
+});
+export type AdminSweep = z.infer<typeof adminSweepSchema>;
+
+export type AdminDeposit = DepositRecord & { userId: string; userName: string; manual: boolean };
+
+export type AdminDepositAttempt = {
+  id: string;
+  userId: string;
+  userName: string;
+  network: DepositNetwork;
+  txId: string;
+  code: string;
+  message: string;
+  createdAt: string;
+};
+
+/**
+ * USDT books. What players and the house have earned must equal what came in
+ * minus what went out: players + house = deposits + adjustments − payouts.
+ * Sweeps cancel out of this (they lower both sides) and are shown for reference.
+ */
+export type ReconciliationReport = {
+  ok: boolean;
+  /** actual − expected; anything but 0 is a problem. */
+  difference: number;
+  actual: { players: number; house: number; sweeps: number; total: number };
+  expected: { deposits: number; adjustments: number; payouts: number; total: number };
+  checkedAt: string;
+};
+
+export type SolvencyReport = {
+  networks: {
+    network: DepositNetwork;
+    address: string;
+    reachable: boolean;
+    /** On-chain USDT at our receiving address, in 0.000001 USDT; null if unreachable. */
+    balance: number | null;
+    error?: string;
+  }[];
+  onChain: number;
+  /** What players hold (available + locked) plus house earnings not yet swept. */
+  owed: { players: number; house: number; total: number };
+  /** onChain − owed. Negative means the receiving wallets alone cannot cover it. */
+  margin: number;
+  checkedAt: string;
+};
+
+export type HouseSweep = { id: string; amount: number; note: string; adminName: string; createdAt: string };
+
+export type BackupInfo = { file: string; size: number; createdAt: string; by: string | null };

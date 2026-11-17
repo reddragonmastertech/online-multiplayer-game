@@ -1,9 +1,9 @@
-import { formatAmount, type AdminDashboard } from "@game-platform/shared";
+import { can, formatAmount, type AdminDashboard } from "@game-platform/shared";
 import { AlertTriangle, OctagonAlert } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { adminDashboardRequest } from "@/lib/admin-api";
+import { adminBackupNow, adminDashboardRequest, useAdminSession } from "@/lib/admin-api";
 import { cn } from "@/lib/utils";
 import { AdminSection, Stat, messageOf } from "./admin-ui";
 
@@ -18,6 +18,8 @@ const usdt = (amount: number) => formatAmount("usdt", amount);
 export function AdminDashboardPage() {
   const [data, setData] = useState<AdminDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const role = useAdminSession((state) => state.session?.role);
+  const [backingUp, setBackingUp] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -111,6 +113,42 @@ export function AdminDashboardPage() {
           detail={`${data.money.withdrawalsPaidToday.count} withdrawal(s)`}
         />
       </div>
+
+      <AdminSection title="Books and backups">
+        <p className="text-sm">
+          USDT books:{" "}
+          <Link to="/admin/money" className={data.reconciliation.ok ? "font-semibold text-primary" : "font-semibold text-danger"}>
+            {data.reconciliation.ok ? "balanced" : `off by ${usdt(data.reconciliation.difference)}`}
+          </Link>
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+          <span>
+            Last backup:{" "}
+            {data.lastBackup ? `${new Date(data.lastBackup.createdAt).toLocaleString()} (${Math.round(data.lastBackup.size / 1024)} KB)` : "none yet"}
+          </span>
+          {can(role, "admins.manage") ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={backingUp}
+              onClick={async () => {
+                setBackingUp(true);
+                try {
+                  await adminBackupNow();
+                  await load();
+                } catch (cause) {
+                  setError(messageOf(cause));
+                } finally {
+                  setBackingUp(false);
+                }
+              }}
+            >
+              {backingUp ? "Backing up…" : "Back up now"}
+            </Button>
+          ) : null}
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">The server also backs up by itself once a day.</p>
+      </AdminSection>
 
       <AdminSection title="House earnings (USDT)">
         <table className="w-full text-sm">

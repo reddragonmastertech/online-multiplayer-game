@@ -27,7 +27,8 @@ export function withdrawalFee(amount: number) {
   return Math.floor((amount * WITHDRAWAL_RULES.feeBps) / 10_000);
 }
 
-export const withdrawalStatusSchema = z.enum(["pending", "paid", "rejected"]);
+/** pending: waiting for an admin; processing: an admin has claimed it and is sending. */
+export const withdrawalStatusSchema = z.enum(["pending", "processing", "paid", "rejected"]);
 export type WithdrawalStatus = z.infer<typeof withdrawalStatusSchema>;
 
 export const withdrawalRequestSchema = z.object({
@@ -61,8 +62,13 @@ export const withdrawalListSchema = z.object({
 export type WithdrawalList = z.infer<typeof withdrawalListSchema>;
 
 export const adminWithdrawalSchema = withdrawalRecordSchema.extend({
+  userId: z.string().min(1),
   userName: z.string().min(1),
   decidedBy: z.string().nullable(),
+  /** The admin who claimed it to send the payout. */
+  claimedById: z.string().nullable(),
+  claimedBy: z.string().nullable(),
+  claimedAt: isoDateSchema.nullable(),
 });
 export type AdminWithdrawal = z.infer<typeof adminWithdrawalSchema>;
 
@@ -72,6 +78,9 @@ export const adminWithdrawalListSchema = z.object({
 export type AdminWithdrawalList = z.infer<typeof adminWithdrawalListSchema>;
 
 export const withdrawalDecisionSchema = z.discriminatedUnion("action", [
+  /** "I am sending this one": no other admin can pay it while claimed. */
+  z.object({ action: z.literal("claim") }),
+  z.object({ action: z.literal("release") }),
   z.object({ action: z.literal("paid"), txId: z.string().trim().min(1).max(80) }),
   z.object({ action: z.literal("reject"), reason: z.string().trim().min(1).max(200) }),
 ]);

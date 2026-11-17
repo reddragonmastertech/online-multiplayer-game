@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { postJson, type ChainLookup, type TokenTransfer } from "./chain";
+import { ChainUnavailableError, postJson, type ChainLookup, type TokenTransfer } from "./chain";
 import { TRANSFER_TOPIC } from "./evm";
 
 /**
@@ -95,4 +95,32 @@ export async function lookupTron(baseUrl: string, apiKey: string | undefined, tx
   };
   const head = now.block_header?.raw_data?.number ?? info.blockNumber;
   return { status: "mined", confirmations: head - info.blockNumber + 1, transfers: transfersFromTronInfo(info) };
+}
+
+/** TRC-20 `balanceOf(address)`, read with a constant (free, read-only) contract call. */
+export async function usdtBalanceTron(baseUrl: string, apiKey: string | undefined, contract: string, address: string) {
+  const hex = tronBase58ToHex(address);
+  if (!hex) throw new Error(`${address} is not a Tron address`);
+  const headers: Record<string, string> = apiKey ? { "TRON-PRO-API-KEY": apiKey } : {};
+  const reply = (await postJson(
+    `${baseUrl}/wallet/triggerconstantcontract`,
+    {
+      owner_address: address,
+      contract_address: contract,
+      function_selector: "balanceOf(address)",
+      parameter: hex.slice(2).padStart(64, "0"),
+      visible: true,
+    },
+    headers,
+  )) as { constant_result?: string[]; result?: { result?: boolean; message?: string } };
+  const value = reply.constant_result?.[0];
+  if (value === undefined) {
+    throw new ChainUnavailableError(`TronGrid did not return a balance: ${reply.result?.message ?? "no result"}`);
+  }
+  return BigInt(`0x${value || "0"}`);
+}
+
+export async function pingTron(baseUrl: string, apiKey: string | undefined) {
+  const headers: Record<string, string> = apiKey ? { "TRON-PRO-API-KEY": apiKey } : {};
+  await postJson(`${baseUrl}/wallet/getnowblock`, {}, headers);
 }

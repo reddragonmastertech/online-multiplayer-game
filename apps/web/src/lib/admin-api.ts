@@ -2,6 +2,14 @@ import {
   apiPaths,
   type AdminAuditEntry,
   type AdminDashboard,
+  type AdminDeposit,
+  type AdminDepositAttempt,
+  type AdminManualDeposit,
+  type BackupInfo,
+  type DepositRecord,
+  type HouseSweep,
+  type ReconciliationReport,
+  type SolvencyReport,
   type AdminGate,
   type AdminPlayerAction,
   type AdminPlayerDetail,
@@ -107,3 +115,19 @@ export const adminDecideWithdrawal = (id: string, body: WithdrawalDecision) =>
     apiPaths.adminWithdrawalDecision.replace(":id", encodeURIComponent(id)),
     post(body),
   );
+
+/* D2: money safety. */
+export const adminDepositsRequest = (query: { q?: string; userId?: string } = {}) => {
+  const params = new URLSearchParams();
+  if (query.q) params.set("q", query.q);
+  if (query.userId) params.set("userId", query.userId);
+  return adminRequest<{ deposits: AdminDeposit[]; attempts: AdminDepositAttempt[] }>(`${apiPaths.adminDeposits}?${params}`);
+};
+export const adminManualDeposit = (body: AdminManualDeposit) =>
+  adminRequest<{ deposit: DepositRecord }>(apiPaths.adminDepositsManual, post(body));
+export const adminSolvencyRequest = () =>
+  adminRequest<{ reconciliation: ReconciliationReport; solvency: SolvencyReport }>(apiPaths.adminSolvency);
+export const adminSweepsRequest = () => adminRequest<{ available: number; sweeps: HouseSweep[] }>(apiPaths.adminSweeps);
+export const adminRecordSweep = (amount: number, note: string) =>
+  adminRequest<{ available: number; sweeps: HouseSweep[] }>(apiPaths.adminSweeps, post({ amount, note }));
+export const adminBackupNow = () => adminRequest<{ backup: BackupInfo }>(apiPaths.adminBackups, { method: "POST" });

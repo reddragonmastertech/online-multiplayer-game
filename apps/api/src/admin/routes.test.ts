@@ -244,7 +244,9 @@ describe("admin roles and actions", () => {
     const dashboard = (await app.inject({ method: "GET", url: "/api/admin/dashboard", headers: owner })).json();
     expect(dashboard.players.total).toBe(4);
     expect(dashboard.money.usdtHeld.available).toBe(20_000_000);
-    expect(dashboard.alerts).toEqual([]);
+    // The books balance; the only alert is that no backup exists yet.
+    expect(dashboard.reconciliation).toMatchObject({ ok: true, difference: 0 });
+    expect(dashboard.alerts).toEqual([{ level: "warning", message: "No backup has been made yet." }]);
 
     await app.close();
   });

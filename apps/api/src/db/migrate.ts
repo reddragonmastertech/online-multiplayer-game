@@ -207,6 +207,46 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX admin_notes_user ON admin_notes (user_id, created_at)`,
     ],
   },
+  {
+    // Money safety. A withdrawal can be claimed by one admin while they send
+    // it. Failed deposit claims are kept for support. Sweeps record house
+    // earnings taken out, so the books still balance. Backups are listed so
+    // the dashboard can show the last one. `manual` marks deposits an admin
+    // credited by hand.
+    version: 6,
+    name: "withdrawal claims, deposit attempts, sweeps and backups",
+    statements: [
+      `ALTER TABLE withdrawals ADD COLUMN claimed_by TEXT REFERENCES users (id)`,
+      `ALTER TABLE withdrawals ADD COLUMN claimed_at TEXT`,
+      `ALTER TABLE deposits ADD COLUMN manual_by TEXT REFERENCES users (id)`,
+      `CREATE TABLE deposit_attempts (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users (id),
+        network TEXT NOT NULL,
+        tx_id TEXT NOT NULL,
+        code TEXT NOT NULL,
+        message TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX deposit_attempts_user ON deposit_attempts (user_id, created_at)`,
+      `CREATE INDEX deposit_attempts_time ON deposit_attempts (created_at)`,
+      `CREATE TABLE house_sweeps (
+        id TEXT PRIMARY KEY,
+        currency TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        note TEXT NOT NULL,
+        admin_id TEXT NOT NULL REFERENCES users (id),
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE TABLE backups (
+        id TEXT PRIMARY KEY,
+        file TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        admin_id TEXT REFERENCES users (id),
+        created_at TEXT NOT NULL
+      )`,
+    ],
+  },
 ];
 
 export function schemaVersion(client: SqliteClient) {

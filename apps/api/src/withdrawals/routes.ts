@@ -40,11 +40,11 @@ export function registerWithdrawalRoutes(app: FastifyInstance, deps: { service: 
   );
 
   app.post<{ Params: { id: string } }>(apiPaths.adminWithdrawalDecision, async (request, reply) =>
-    respond(reply, () => {
+    respond(reply, async () => {
       const admin = authenticateAdmin(request, auth, "withdrawals.decide");
       const parsed = withdrawalDecisionSchema.safeParse(request.body);
       if (!parsed.success) throw invalidInput("Give a transaction ID to mark it paid, or a reason to reject it.");
-      const withdrawal = service.decide(admin, request.params.id, parsed.data);
+      const withdrawal = await service.decide(admin, request.params.id, parsed.data);
       request.log.info(
         { adminId: admin.userId, withdrawalId: withdrawal.id, status: withdrawal.status, payoutTxId: withdrawal.payoutTxId },
         "withdrawal decided",

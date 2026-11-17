@@ -76,11 +76,16 @@ Optional:
    Every admin session after that asks for a fresh code and lasts 8 hours.
    Lost your phone? Another owner can reset it on your player page; if you
    are the only owner, run `admin -- "<name>" reset-2fa` on the server.
-3. `/admin/withdrawals` lists waiting requests with the exact amount, network and address.
-   Send that amount from your own wallet, paste the transaction ID, and press
-   **Mark paid**. Or give a reason and **Reject**: the player gets the full
-   amount back.
-4. On ERC20 the gas you pay can be more than the 1% fee on a small request.
+3. `/admin/withdrawals` lists open requests with the exact amount, network
+   and address. Press **Claim and send** first, so no other admin pays it
+   too. Send that amount from your own wallet, paste the transaction ID, and
+   press **Mark paid**: the server reads the transaction on the chain and
+   only accepts it if the payout really reached the player. Or give a reason
+   and **Reject**: the player gets the full amount back.
+4. `/admin/money` shows whether the USDT books balance and what your
+   receiving wallets really hold on-chain. When you take house earnings out,
+   record it there as a sweep.
+5. On ERC20 the gas you pay can be more than the 1% fee on a small request.
 
 Never set `DEPOSIT_CHAIN_FAKE_FILE` here. It is for the browser tests, and
 the server refuses to start with it in production.
@@ -208,9 +213,15 @@ configs here give it time to finish.
 A match cannot survive a restart. Players in one get their stake back rather
 than losing it, and anything missed by a hard kill is swept on the next start.
 
-Back up `apps/api/data/`. It holds every account, balance and result. SQLite
-runs in WAL mode, so copy the `.db`, `.db-wal` and `.db-shm` files together, or
-stop the service first:
+The server backs itself up once a day to `apps/api/data/backups/`
+(`BACKUP_DIR`), keeping the newest 14 (`BACKUP_KEEP`). Each file is a
+complete, consistent copy taken while it runs; to restore, stop the service
+and copy one over `game.db` (delete `game.db-wal` and `game.db-shm` first).
+An owner can also press **Back up now** on the admin dashboard.
+
+Those copies sit on the same disk as the database, so also copy the
+`backups` folder somewhere else regularly. For a full copy by hand, copy the
+`.db`, `.db-wal` and `.db-shm` files together, or stop the service first:
 
 ```bash
 sudo systemctl stop arena

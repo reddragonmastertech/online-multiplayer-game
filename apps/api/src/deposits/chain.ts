@@ -23,6 +23,10 @@ export type ChainLookup =
 
 export type ChainClient = {
   lookup(network: DepositNetwork, txId: string): Promise<ChainLookup>;
+  /** USDT held by `address`, in the token's own smallest unit. */
+  usdtBalance(network: DepositNetwork, address: string): Promise<bigint>;
+  /** Throws `ChainUnavailableError` when the network cannot be reached. */
+  ping(network: DepositNetwork): Promise<void>;
 };
 
 /**

@@ -43,6 +43,10 @@ const envSchema = z.object({
   TRONGRID_API_KEY: optionalText,
   /** Browser tests only: read transactions from this JSON file instead of a chain. */
   DEPOSIT_CHAIN_FAKE_FILE: optionalText,
+  /** Where daily backups go; defaults to a `backups` folder next to the database. */
+  BACKUP_DIR: optionalText,
+  /** How many daily backups to keep. */
+  BACKUP_KEEP: z.coerce.number().int().positive().default(14),
 });
 
 export type AppConfig = {
@@ -60,6 +64,8 @@ export type AppConfig = {
   sentryDsn?: string;
   /** Leave out for no receiving addresses and the default public endpoints. */
   deposits?: DepositConfig;
+  /** Leave out to back up next to the database, keeping 14. */
+  backup?: { dir?: string; keep: number };
 };
 
 export type DepositConfig = {
@@ -124,5 +130,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       },
       fakeChainFile: parsed.DEPOSIT_CHAIN_FAKE_FILE,
     },
+    backup: { dir: parsed.BACKUP_DIR, keep: parsed.BACKUP_KEEP },
   };
 }

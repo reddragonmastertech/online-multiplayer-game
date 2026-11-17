@@ -23,6 +23,7 @@ import { adjustBalance, readWallets } from "../economy/wallet";
 import { HttpError, invalidInput, notFound } from "../http/errors";
 import { loadMatchHistory } from "../match/history";
 import { readAudit, recordAudit } from "./audit";
+import { lastBackup, reconcileUsdt } from "./books";
 import { generateTotpSecret, totpUri, verifyTotp } from "./totp";
 
 export type AdminActor = { userId: string; name: string; role: AdminRole; ip?: string | null };
@@ -245,6 +246,20 @@ export function createAdminService(deps: { db: AppDatabase; jwtSecret: string; l
       alerts.push({ level: "error", message: `${unsettled.n} finished match(es) have no payout. Settlement failed.` });
     }
 
+    const reconciliation = reconcileUsdt(db, at);
+    if (!reconciliation.ok) {
+      alerts.push({
+        level: "error",
+        message: `The USDT books are off by ${formatAmount("usdt", reconciliation.difference, { sign: true })}. See the money page.`,
+      });
+    }
+    const backup = lastBackup(db);
+    if (!backup) {
+      alerts.push({ level: "warning", message: "No backup has been made yet." });
+    } else if (at.getTime() - new Date(backup.createdAt).getTime() > 26 * 3600 * 1000) {
+      alerts.push({ level: "warning", message: `The last backup is from ${new Date(backup.createdAt).toLocaleString()}.` });
+    }
+
     return {
       players: {
         total: players.total,
@@ -261,6 +276,8 @@ export function createAdminService(deps: { db: AppDatabase; jwtSecret: string; l
         house,
       },
       alerts,
+      reconciliation,
+      lastBackup: backup,
       generatedAt: at.toISOString(),
     };
   }

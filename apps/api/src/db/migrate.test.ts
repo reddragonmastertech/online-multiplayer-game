@@ -15,6 +15,9 @@ const TABLES = [
   "withdrawals",
   "admin_audit",
   "admin_notes",
+  "deposit_attempts",
+  "house_sweeps",
+  "backups",
 ];
 
 function tableNames(db: DatabaseSync) {

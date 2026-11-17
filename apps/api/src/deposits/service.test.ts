@@ -61,6 +61,8 @@ function setup(answers: Record<string, ChainLookup | Error> = {}, addresses: Rec
   }
   const lookups: string[] = [];
   const chain: ChainClient = {
+    usdtBalance: async () => 0n,
+    ping: async () => {},
     async lookup(_network, txId) {
       lookups.push(txId);
       const answer = answers[txId];

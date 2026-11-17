@@ -381,6 +381,31 @@ player search and a player page with every action.
 - **Not built here:** the chain-reader alert (needs D2's health checks), and
   a change-password screen for players (Roadmap 4.4), so a temporary password
   stays until an admin sets another.
+
+### Roadmap 4.2 part D2 — money safety
+
+- **A withdrawal is claimed before it is sent.** Claiming moves it to
+  `processing` for one admin; only that admin can mark it paid, and an owner
+  can release a claim someone abandoned. The player sees "Being sent".
+- **Mark paid reads the chain.** The payout TxID must have succeeded and sent
+  at least the payout in real USDT to the player's saved address, or it is
+  refused and nothing moves. A typo can no longer close an unpaid request.
+- **Deposits an admin can fix:** a list and search, every refused claim kept
+  in `deposit_attempts`, and a manual credit for money that arrived but the
+  claim refused (under 3 USDT, or from an unsaved wallet). The chain still
+  decides the amount and the TxID is still unique.
+- **The books.** Players plus house must equal deposits plus adjustments
+  minus payouts. My first formula also subtracted sweeps on one side only;
+  the test that walks a deposit, a match, a withdrawal and a sweep through
+  the books caught it. A sweep lowers both sides, so it cancels out; it
+  belongs in the solvency check, which compares the receiving wallets'
+  real on-chain USDT with what is still owed.
+- **Reading balances and health:** `eth_call balanceOf` on Ethereum and BNB
+  Chain, a constant contract call on Tron, checked by hand against live
+  mainnet addresses.
+- **Backups are automatic:** an hourly check takes a `VACUUM INTO` copy when
+  the last one is a day old, keeps 14, and checks the books. Owners can back
+  up on demand; the dashboard warns when there is none or it is stale.
 ---
 
 ## Deliberately not built

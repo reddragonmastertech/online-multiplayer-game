@@ -11,10 +11,11 @@ import {
   type WithdrawalRecord,
   type WithdrawalStatus,
 } from "@game-platform/shared";
+import { recordAudit } from "../admin/audit";
 import type { AppDatabase } from "../db/client";
 import { withTransaction } from "../db/client";
+import { ChainUnavailableError, USDT_CONTRACTS, canonicalAddress, toUsdtUnits, type ChainClient } from "../deposits/chain";
 import { completeWithdrawal, lockWithdrawal, returnWithdrawal } from "../economy/wallet";
-import { recordAudit } from "../admin/audit";
 import { HttpError, invalidInput, notFound } from "../http/errors";
 
 type WithdrawalRow = {
@@ -29,12 +30,14 @@ type WithdrawalRow = {
   payout_tx_id: string | null;
   note: string | null;
   decided_by: string | null;
+  claimed_by: string | null;
+  claimed_at: string | null;
   created_at: string;
   decided_at: string | null;
 };
 
 const COLUMNS =
-  "w.id, w.user_id, w.network, w.address, w.amount, w.fee, w.payout, w.status, w.payout_tx_id, w.note, w.decided_by, w.created_at, w.decided_at";
+  "w.id, w.user_id, w.network, w.address, w.amount, w.fee, w.payout, w.status, w.payout_tx_id, w.note, w.decided_by, w.claimed_by, w.claimed_at, w.created_at, w.decided_at";
 
 function toRecord(row: WithdrawalRow): WithdrawalRecord {
   return {
@@ -52,8 +55,10 @@ function toRecord(row: WithdrawalRow): WithdrawalRecord {
   };
 }
 
-export function createWithdrawalService(deps: { db: AppDatabase; now?: () => string }) {
-  const { db } = deps;
+const conflict = (message: string) => new HttpError(409, "invalid_input", message);
+
+export function createWithdrawalService(deps: { db: AppDatabase; chain: ChainClient; now?: () => string }) {
+  const { db, chain } = deps;
   const now = deps.now ?? (() => new Date().toISOString());
 
   function list(userId: string): WithdrawalRecord[] {
@@ -98,13 +103,15 @@ export function createWithdrawalService(deps: { db: AppDatabase; now?: () => str
       payout_tx_id: null,
       note: null,
       decided_by: null,
+      claimed_by: null,
+      claimed_at: null,
       created_at: now(),
       decided_at: null,
     };
 
     withTransaction(db, () => {
       const waiting = db
-        .prepare("SELECT COUNT(*) AS n FROM withdrawals WHERE user_id = ? AND status = 'pending'")
+        .prepare("SELECT COUNT(*) AS n FROM withdrawals WHERE user_id = ? AND status IN ('pending', 'processing')")
         .get(userId) as { n: number };
       if (waiting.n >= WITHDRAWAL_RULES.maxPending) {
         throw new HttpError(
@@ -131,101 +138,179 @@ export function createWithdrawalService(deps: { db: AppDatabase; now?: () => str
     return toRecord(row);
   }
 
-  /** Every pending request first, oldest first, then the latest decided ones. */
-  /** For admins; the route checks the permission. */
+  /** Waiting and claimed requests first, oldest first, then the latest decided ones. For admins. */
   function adminList(): AdminWithdrawal[] {
     const rows = db
       .prepare(
-        `SELECT ${COLUMNS}, u.name AS user_name, a.name AS admin_name
+        `SELECT ${COLUMNS}, u.name AS user_name, a.name AS admin_name, c.name AS claimer_name
          FROM withdrawals w
          JOIN users u ON u.id = w.user_id
          LEFT JOIN users a ON a.id = w.decided_by
-         ORDER BY CASE w.status WHEN 'pending' THEN 0 ELSE 1 END,
-                  CASE w.status WHEN 'pending' THEN w.created_at END ASC,
+         LEFT JOIN users c ON c.id = w.claimed_by
+         ORDER BY CASE WHEN w.status IN ('pending', 'processing') THEN 0 ELSE 1 END,
+                  CASE WHEN w.status IN ('pending', 'processing') THEN w.created_at END ASC,
                   w.decided_at DESC
          LIMIT 200`,
       )
-      .all() as (WithdrawalRow & { user_name: string; admin_name: string | null })[];
-    return rows.map((row) => ({ ...toRecord(row), userName: row.user_name, decidedBy: row.admin_name }));
+      .all() as (WithdrawalRow & { user_name: string; admin_name: string | null; claimer_name: string | null })[];
+    return rows.map((row) => ({
+      ...toRecord(row),
+      userId: row.user_id,
+      userName: row.user_name,
+      decidedBy: row.admin_name,
+      claimedById: row.claimed_by,
+      claimedBy: row.claimer_name,
+      claimedAt: row.claimed_at,
+    }));
+  }
+
+  function load(withdrawalId: string) {
+    const row = db.prepare(`SELECT ${COLUMNS} FROM withdrawals w WHERE w.id = ?`).get(withdrawalId) as WithdrawalRow | undefined;
+    if (!row) throw notFound("That withdrawal does not exist.");
+    return row;
   }
 
   /**
-   * An admin marks a request paid (after sending the USDT themselves) or
-   * rejects it. Only a pending request can be decided, and only once: the
-   * status check is part of the UPDATE, so two admins cannot both decide it.
+   * Reads the payout transaction from the chain and refuses it unless it
+   * succeeded and sent at least the payout in real USDT to the player's
+   * address. This stops a typo, or the wrong transaction, from closing a
+   * request that was never really paid.
    */
-  function decide(
-    admin: { userId: string; ip?: string | null },
-    withdrawalId: string,
-    decision: WithdrawalDecision,
-  ): WithdrawalRecord {
-    const adminId = admin.userId;
-
-    const row = db.prepare(`SELECT ${COLUMNS} FROM withdrawals w WHERE w.id = ?`).get(withdrawalId) as
-      | WithdrawalRow
-      | undefined;
-    if (!row) throw notFound("That withdrawal does not exist.");
-    if (row.status !== "pending") {
-      throw new HttpError(409, "invalid_input", `That withdrawal is already ${row.status}.`);
-    }
-
-    const decidedAt = now();
-    let txId: string | null = null;
-    if (decision.action === "paid") {
-      txId = normalizeTxId(row.network, decision.txId) ?? null;
-      if (!txId) {
-        throw invalidInput(`That is not a ${NETWORK_INFO[row.network].label} transaction ID.`);
-      }
-    }
-
+  async function checkPayout(row: WithdrawalRow, txId: string) {
+    const info = NETWORK_INFO[row.network];
+    let lookup;
     try {
-      withTransaction(db, () => {
-        const updated = db
-          .prepare(
-            `UPDATE withdrawals SET status = ?, payout_tx_id = ?, note = ?, decided_by = ?, decided_at = ?
-             WHERE id = ? AND status = 'pending'`,
-          )
-          .run(
-            decision.action === "paid" ? "paid" : "rejected",
-            txId,
-            decision.action === "reject" ? decision.reason : null,
-            adminId,
-            decidedAt,
-            withdrawalId,
-          );
-        if (Number(updated.changes) !== 1) {
-          throw new HttpError(409, "invalid_input", "That withdrawal was decided a moment ago.");
-        }
-
-        if (decision.action === "paid") {
-          completeWithdrawal(db, { userId: row.user_id, withdrawalId, amount: row.amount, fee: row.fee, now: decidedAt });
-        } else {
-          returnWithdrawal(db, { userId: row.user_id, withdrawalId, amount: row.amount, now: decidedAt });
-        }
-
-        recordAudit(db, {
-          adminId,
-          action: decision.action === "paid" ? "withdrawal.paid" : "withdrawal.rejected",
-          targetUserId: row.user_id,
-          details: {
-            withdrawalId,
-            network: row.network,
-            payout: row.payout,
-            ...(decision.action === "paid" ? { txId } : { reason: decision.reason }),
-          },
-          ip: admin.ip,
-          now: decidedAt,
-        });
-      });
+      lookup = await chain.lookup(row.network, txId);
     } catch (error) {
-      if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
-        throw invalidInput("That transaction ID already settles another withdrawal.");
+      if (error instanceof ChainUnavailableError) {
+        throw conflict(`We could not reach the ${info.chain} network to check the payout. Try again in a minute.`);
       }
       throw error;
     }
+    if (lookup.status === "not_found") {
+      throw conflict(`That transaction is not on the ${info.chain} network yet. Wait a moment and try again.`);
+    }
+    if (lookup.status === "failed") throw invalidInput("That transaction failed on the chain, so nothing was sent.");
 
-    const decided = db.prepare(`SELECT ${COLUMNS} FROM withdrawals w WHERE w.id = ?`).get(withdrawalId) as WithdrawalRow;
-    return toRecord(decided);
+    const usdt = canonicalAddress(row.network, USDT_CONTRACTS[row.network].contract);
+    const to = canonicalAddress(row.network, row.address);
+    const sent = lookup.transfers
+      .filter((transfer) => transfer.contract === usdt && transfer.to === to)
+      .reduce((sum, transfer) => sum + transfer.amount, 0n);
+    const units = toUsdtUnits(row.network, sent);
+    if (units === 0) {
+      throw invalidInput(`That transaction sent no USDT to the player's address ${row.address}.`);
+    }
+    if (units < row.payout) {
+      throw invalidInput(
+        `That transaction sent ${formatAmount("usdt", units)}, but the payout is ${formatAmount("usdt", row.payout)}.`,
+      );
+    }
+    return units;
+  }
+
+  /**
+   * The admin side of a withdrawal:
+   * - **claim**: "I am sending this one". Only a waiting request can be
+   *   claimed, by one admin at a time, so two admins never both pay it.
+   * - **release**: give up a claim (the claimer, or an owner).
+   * - **paid**: only the claimer, and only after the chain confirms the
+   *   payout reached the player's address.
+   * - **reject**: a waiting request, or one you have claimed. The full amount
+   *   goes back to the player.
+   * Every status check sits inside the UPDATE, so a race cannot slip past it.
+   */
+  async function decide(
+    admin: { userId: string; role?: string; ip?: string | null },
+    withdrawalId: string,
+    decision: WithdrawalDecision,
+  ): Promise<WithdrawalRecord> {
+    const adminId = admin.userId;
+    const row = load(withdrawalId);
+    const at = now();
+    const audit = (action: string, details: Record<string, unknown>) =>
+      recordAudit(db, {
+        adminId,
+        action,
+        targetUserId: row.user_id,
+        details: { withdrawalId, network: row.network, payout: row.payout, ...details },
+        ip: admin.ip,
+        now: at,
+      });
+
+    if (decision.action === "claim") {
+      withTransaction(db, () => {
+        const updated = db
+          .prepare("UPDATE withdrawals SET status = 'processing', claimed_by = ?, claimed_at = ? WHERE id = ? AND status = 'pending'")
+          .run(adminId, at, withdrawalId);
+        if (Number(updated.changes) !== 1) {
+          throw conflict(
+            row.status === "processing" ? "Another admin is already sending this one." : `That withdrawal is already ${row.status}.`,
+          );
+        }
+        audit("withdrawal.claimed", {});
+      });
+      return toRecord(load(withdrawalId));
+    }
+
+    if (decision.action === "release") {
+      withTransaction(db, () => {
+        const updated = db
+          .prepare(
+            `UPDATE withdrawals SET status = 'pending', claimed_by = NULL, claimed_at = NULL
+             WHERE id = ? AND status = 'processing' AND (claimed_by = ? OR ? = 'owner')`,
+          )
+          .run(withdrawalId, adminId, admin.role ?? "");
+        if (Number(updated.changes) !== 1) throw conflict("Only the admin who claimed it, or an owner, can release it.");
+        audit("withdrawal.released", { claimedBy: row.claimed_by });
+      });
+      return toRecord(load(withdrawalId));
+    }
+
+    if (decision.action === "paid") {
+      if (row.status !== "processing" || row.claimed_by !== adminId) {
+        throw conflict("Claim the withdrawal first; only the admin who claimed it can mark it paid.");
+      }
+      const txId = normalizeTxId(row.network, decision.txId);
+      if (!txId) throw invalidInput(`That is not a ${NETWORK_INFO[row.network].label} transaction ID.`);
+      const sent = await checkPayout(row, txId);
+
+      try {
+        withTransaction(db, () => {
+          const updated = db
+            .prepare(
+              `UPDATE withdrawals SET status = 'paid', payout_tx_id = ?, decided_by = ?, decided_at = ?
+               WHERE id = ? AND status = 'processing' AND claimed_by = ?`,
+            )
+            .run(txId, adminId, at, withdrawalId, adminId);
+          if (Number(updated.changes) !== 1) throw conflict("That withdrawal changed a moment ago. Reload it.");
+          completeWithdrawal(db, { userId: row.user_id, withdrawalId, amount: row.amount, fee: row.fee, now: at });
+          audit("withdrawal.paid", { txId, sentOnChain: sent });
+        });
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
+          throw invalidInput("That transaction ID already settles another withdrawal.");
+        }
+        throw error;
+      }
+      return toRecord(load(withdrawalId));
+    }
+
+    const reason = decision.reason;
+    withTransaction(db, () => {
+      const updated = db
+        .prepare(
+          `UPDATE withdrawals SET status = 'rejected', note = ?, decided_by = ?, decided_at = ?
+           WHERE id = ? AND (status = 'pending' OR (status = 'processing' AND claimed_by = ?))`,
+        )
+        .run(reason, adminId, at, withdrawalId, adminId);
+      if (Number(updated.changes) !== 1) {
+        throw conflict(row.status === "processing" ? "Another admin has claimed this one." : `That withdrawal is already ${row.status}.`);
+      }
+      returnWithdrawal(db, { userId: row.user_id, withdrawalId, amount: row.amount, now: at });
+      audit("withdrawal.rejected", { reason });
+    });
+    return toRecord(load(withdrawalId));
   }
 
   return { list, request, adminList, decide };

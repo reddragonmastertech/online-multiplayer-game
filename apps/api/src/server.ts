@@ -1,3 +1,4 @@
+import { dirname, join } from "node:path";
 import cors from "@fastify/cors";
 import { createGameRegistry } from "@game-platform/game-core";
 import {
@@ -16,7 +17,8 @@ import type { ChainClient } from "./deposits/chain";
 import { createChainClient, createFileChainClient } from "./deposits/client";
 import { registerDepositRoutes } from "./deposits/routes";
 import { createDepositService } from "./deposits/service";
-import { registerAdminRoutes } from "./admin/routes";
+import { createBackup, lastBackup, reconcileUsdt } from "./admin/books";
+import { registerAdminRoutes, registerMoneyRoutes } from "./admin/routes";
 import { createAdminService } from "./admin/service";
 import { registerWithdrawalRoutes } from "./withdrawals/routes";
 import { createWithdrawalService } from "./withdrawals/service";
@@ -62,7 +64,7 @@ export async function buildServer(config: AppConfig, overrides: { chain?: ChainC
   const deposits = createDepositService({ db, chain, addresses: depositConfig.addresses });
   const auth = { db, jwtSecret: config.jwtSecret };
   await registerDepositRoutes(app, { service: deposits, auth });
-  registerWithdrawalRoutes(app, { service: createWithdrawalService({ db }), auth });
+  registerWithdrawalRoutes(app, { service: createWithdrawalService({ db, chain }), auth });
   if (depositConfig.fakeChainFile) {
     app.log.warn({ file: depositConfig.fakeChainFile }, "deposits read from a test file, not a real chain");
   }
@@ -95,6 +97,32 @@ export async function buildServer(config: AppConfig, overrides: { chain?: ChainC
     },
   });
   await registerAdminRoutes(app, { service: admin, auth });
+  const backup = {
+    dir: config.backup?.dir ?? join(dirname(resolveSqlitePath(config.databaseUrl)), "backups"),
+    keep: config.backup?.keep ?? 14,
+  };
+  registerMoneyRoutes(app, { auth, deposits, chain, addresses: depositConfig.addresses, backup });
+
+  // Housekeeping, hourly: a backup when the last one is a day old, and a
+  // check that the USDT books balance. Off in tests, which make their own.
+  const housekeeping = () => {
+    try {
+      const last = lastBackup(db);
+      if (!last || Date.now() - new Date(last.createdAt).getTime() > 24 * 3600 * 1000) {
+        const made = createBackup(db, backup);
+        app.log.info({ file: made.file, size: made.size }, "daily backup written");
+      }
+      const books = reconcileUsdt(db);
+      if (!books.ok) app.log.error(books, "USDT books do not balance");
+    } catch (error) {
+      app.log.error({ error: String(error) }, "housekeeping failed");
+    }
+  };
+  const housekeepingTimer = config.nodeEnv === "test" ? null : setInterval(housekeeping, 3600 * 1000);
+  if (housekeepingTimer) {
+    housekeepingTimer.unref();
+    setTimeout(housekeeping, 5000).unref();
+  }
 
   // Public: a visitor may browse matches in progress without an account. The
   // summary carries no hands, so there is nothing here to withhold.
@@ -105,6 +133,7 @@ export async function buildServer(config: AppConfig, overrides: { chain?: ChainC
   const web = await registerWebApp(app, config.webDist);
 
   app.addHook("onClose", async () => {
+    if (housekeepingTimer) clearInterval(housekeepingTimer);
     runtime.stop();
     await io.close();
 

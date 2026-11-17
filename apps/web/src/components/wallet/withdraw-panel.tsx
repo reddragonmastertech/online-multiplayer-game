@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 const statusLabel: Record<WithdrawalRecord["status"], string> = {
   pending: "Waiting for approval",
+  processing: "Being sent",
   paid: "Paid",
   rejected: "Rejected",
 };
@@ -58,7 +59,7 @@ export function WithdrawPanel({
   const address = overview?.wallets.find((wallet) => wallet.network === chosen)?.address;
   const amount = parseAmount("usdt", amountText);
   const validAmount = amount !== undefined && amount > 0 ? amount : undefined;
-  const waiting = withdrawals.some((item) => item.status === "pending");
+  const waiting = withdrawals.some((item) => item.status === "pending" || item.status === "processing");
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -158,7 +159,7 @@ export function WithdrawPanel({
                 className={cn(
                   "text-xs font-semibold",
                   item.status === "paid" && "text-primary",
-                  item.status === "pending" && "text-gold",
+                  (item.status === "pending" || item.status === "processing") && "text-gold",
                   item.status === "rejected" && "text-danger",
                 )}
               >

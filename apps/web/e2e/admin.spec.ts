@@ -37,7 +37,18 @@ test("an owner passes two-factor, adjusts a balance, suspends a player and sees 
   await expect(owner.getByRole("link", { name: "Admin" })).toBeVisible();
   await enterAdmin(owner);
   await expect(owner.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-  await expect(owner.getByText("No alerts. The books add up.")).toBeVisible();
+  // The books balance, and an owner can take a backup on demand.
+  const books = owner.getByRole("region", { name: "Books and backups" });
+  await expect(books.getByRole("link", { name: "balanced" })).toBeVisible();
+  await books.getByRole("button", { name: "Back up now" }).click();
+  await expect(books).not.toContainText("none yet");
+  await expect(books.getByText(/Last backup: .+ KB\)/)).toBeVisible();
+
+  // The money page agrees, and reads the (test) receiving wallets.
+  await owner.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: "Money" }).click();
+  await expect(owner.getByText("The books balance.")).toBeVisible();
+  await expect(owner.getByRole("region", { name: "Receiving wallets on-chain" })).toContainText("TRC20");
+  await owner.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: "Dashboard" }).click();
 
   // Find the player and give them 5 USDT, with a reason.
   await owner.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: "Players" }).click();

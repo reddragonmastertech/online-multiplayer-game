@@ -121,6 +121,7 @@ const tabs = [
   { to: "/admin", label: "Dashboard", end: true, permission: "view" },
   { to: "/admin/players", label: "Players", permission: "view" },
   { to: "/admin/withdrawals", label: "Withdrawals", permission: "view" },
+  { to: "/admin/money", label: "Money", permission: "view" },
   { to: "/admin/audit", label: "Audit log", permission: "view" },
   { to: "/admin/admins", label: "Admins", permission: "view" },
 ] as const;

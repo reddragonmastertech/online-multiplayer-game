@@ -3,12 +3,22 @@ import {
   can,
   formatAmount,
   parseAmount,
+  depositNetworks,
+  type AdminDepositAttempt,
   type AdminPlayerDetail,
   type Currency,
+  type DepositNetwork,
 } from "@game-platform/shared";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { adminPlayerAction, adminPlayerRequest, adminTempPassword, useAdminSession } from "@/lib/admin-api";
+import {
+  adminDepositsRequest,
+  adminManualDeposit,
+  adminPlayerAction,
+  adminPlayerRequest,
+  adminTempPassword,
+  useAdminSession,
+} from "@/lib/admin-api";
 import { cn } from "@/lib/utils";
 import { StatusBadges } from "./admin-players";
 import { ActionForm, AdminSection, CopyButton, Field, messageOf, when } from "./admin-ui";
@@ -31,10 +41,12 @@ export function AdminPlayerPage() {
   const [player, setPlayer] = useState<AdminPlayerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState<AdminDepositAttempt[]>([]);
 
   const load = useCallback(async () => {
     try {
       setPlayer(await adminPlayerRequest(id));
+      setAttempts((await adminDepositsRequest({ userId: id })).attempts);
       setError(null);
     } catch (cause) {
       setError(messageOf(cause));
@@ -217,6 +229,52 @@ export function AdminPlayerPage() {
           ))}
         </ul>
       </AdminSection>
+
+      {money ? (
+        <AdminSection title="Credit a deposit by hand">
+          <p className="mb-2 text-xs text-muted-foreground">
+            For money that really arrived but the normal claim refused: under 3 USDT, or sent from a wallet the player
+            never saved. The chain must show real USDT reaching our address; the amount comes from the chain, minus the
+            1% fee, and the TxID can never be credited twice.
+          </p>
+          <ActionForm
+            title="Credit from a transaction"
+            submitLabel="Check and credit"
+            onSubmit={async (reason, form) => {
+              await adminManualDeposit({
+                userId: id,
+                network: String(form.get("network")) as DepositNetwork,
+                txId: String(form.get("txId") ?? "").trim(),
+                reason,
+              });
+              await load();
+            }}
+          >
+            <label className="block">
+              <span className="mb-1 block text-xs text-muted-foreground">Network</span>
+              <select name="network" className="h-9 rounded-xl border border-border bg-black/40 px-2 text-sm">
+                {depositNetworks.map((network) => (
+                  <option key={network} value={network}>
+                    {NETWORK_INFO[network].label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Field label="Transaction ID" name="txId" />
+          </ActionForm>
+          {attempts.length > 0 ? (
+            <ul className="mt-3 space-y-1 text-sm" aria-label="Refused claims for this player">
+              {attempts.map((attempt) => (
+                <li key={attempt.id} className="break-all">
+                  <span className="text-xs text-muted-foreground">{when(attempt.createdAt)}</span>{" "}
+                  {NETWORK_INFO[attempt.network].label} · {attempt.message}
+                  <span className="block text-xs text-muted-foreground">TxID {attempt.txId}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </AdminSection>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <AdminSection title="Deposits">

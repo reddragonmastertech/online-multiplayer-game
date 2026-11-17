@@ -5,6 +5,7 @@ import { AdminAdminsPage } from "@/pages/admin/admin-admins";
 import { AdminAuditPage } from "@/pages/admin/admin-audit";
 import { AdminDashboardPage } from "@/pages/admin/admin-dashboard";
 import { AdminLayout } from "@/pages/admin/admin-layout";
+import { AdminMoneyPage } from "@/pages/admin/admin-money";
 import { AdminPlayerPage } from "@/pages/admin/admin-player";
 import { AdminPlayersPage } from "@/pages/admin/admin-players";
 import { AdminWithdrawalsPage } from "@/pages/admin/admin-withdrawals";
@@ -45,6 +46,7 @@ export function App() {
             <Route path="players" element={<AdminPlayersPage />} />
             <Route path="players/:id" element={<AdminPlayerPage />} />
             <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
+            <Route path="money" element={<AdminMoneyPage />} />
             <Route path="audit" element={<AdminAuditPage />} />
             <Route path="admins" element={<AdminAdminsPage />} />
           </Route>
