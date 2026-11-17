@@ -3,7 +3,7 @@ import { GameArt } from "@/components/catalog/game-art";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { Button } from "@/components/ui/button";
 import { catalogGames } from "@/lib/catalog";
-import { IntroPreview } from "@/components/home/intro-preview";
+import { IntroPreview } from "@/components/intro/intro-preview";
 
 const steps = [
   { n: "1", title: "Choose a game", body: "Start with Rock Paper Scissors. More games will appear here as they are ready." },

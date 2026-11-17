@@ -203,6 +203,19 @@ harder once strangers have accounts:
   from backup rather than a redeploy. The runbook says so.
 - **The docs match the code again,** and the rough edges are kept in one list.
 
+### Roadmap phase 3 — cleanup
+
+- **`components/home/` is gone,** with `pages/home-page.tsx` and all their fake
+  live matches, winners and chat. The three files still in use moved:
+  `portrait.tsx` to `components/match/` (trimmed to the CPU portrait),
+  `intro-preview.tsx` to `components/intro/`, and the CPU stake lookup to
+  `lib/cpu-stakes.ts`.
+- **CPU practice no longer offers USDT tables.** The old stake list carried
+  `0.1`, `0.2` and `0.5 USDT` next to the RAC ones, so `/vs/0-1-usdt` opened a
+  "0.1 USDT MATCH" despite the rule that USDT stays hidden. The stakes now come
+  from `MATCH_RULES.racStakes`, the same list live play uses, and the e2e suite
+  checks both.
+
 ---
 
 ## Deliberately not built
@@ -230,10 +243,6 @@ the match code or the socket contracts.
 
 The one list of these. Other docs link here rather than repeating it.
 
-- **`components/home/` is dead code with mock data.** `home-page.tsx` is not
-  routed. It still contains fabricated live matches and winners. It should be
-  deleted, carefully: `portrait.tsx`, `lobby-data.ts` and `intro-preview.tsx`
-  are still used.
 - **`infra/redis.ts`, `infra/supabase.ts`, `infra/queue.ts` are dead.** Nothing
   imports them. `config.ts` still parses `REDIS_URL` and `SUPABASE_*`, but
   nothing uses the values.
@@ -255,7 +264,7 @@ order of value:
 
 1. **Publish it** and run the two-device test. Everything else is guesswork
    until real people have played.
-2. **Delete `components/home/`** and the dead `infra/` modules.
+2. **Delete the dead `infra/` modules.** (`components/home/` is done.)
 3. **Match chat** — specified in §5.5 of the UX doc, scoped to the two players.
 4. **A second game.** The structure is ready; it is the real test of whether
    the match shell is as game-agnostic as intended.

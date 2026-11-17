@@ -294,8 +294,8 @@ server's `viewerRole`, never from a local guess.
 | `auth/` | The login/signup dialog |
 | `catalog/` | Game cards, artwork, the live-match list |
 | `match/` | The match room, split for reuse |
+| `intro/` | The tap-a-hand rules preview on the intro page |
 | `ui/` | `Button` |
-| `home/` | **Mostly dead.** See below |
 
 `components/match/` is deliberately split so a second game can reuse it:
 
@@ -304,15 +304,10 @@ server's `viewerRole`, never from a local guess.
 - `game-surface.tsx` — picks a board from `gameId`.
 - `rps-board.tsx` — the three hand buttons. **The RPS-specific part.**
 - `player-seat.tsx`, `round-log.tsx`, `match-closed.tsx` — shared pieces.
+- `portrait.tsx` — stock art for the **CPU** opponent only. Real players get
+  initials, never a photograph.
 
 Adding chess means writing `chess-board.tsx` and one line in `game-surface.tsx`.
-
-> **`components/home/` is legacy.** `chat-room`, `left-rail`, `lobby-main` and
-> `home-header` belong to an old lobby design. `home-page.tsx` is not routed in
-> `app.tsx`, so none of it renders. They still contain mock data — fake live
-> matches, fake winners. Do not copy from them. Three files *are* still used:
-> `portrait.tsx` by the player seat, `lobby-data.ts` by the CPU practice page,
-> and `intro-preview.tsx` by the intro page. The rest is waiting to be deleted.
 
 ### `lib/`
 
@@ -322,6 +317,7 @@ Adding chess means writing `chess-board.tsx` and one line in `game-surface.tsx`.
 | `socket.ts` | One Socket.IO connection, keyed by token |
 | `protocol.ts` | Re-exports the shared types for convenience |
 | `catalog.ts` | The game catalog shown in the lobby |
+| `cpu-stakes.ts` | The CPU practice stakes, taken from `MATCH_RULES` |
 | `utils.ts` | `cn()` for merging Tailwind classes |
 
 ### `index.css` — the theme
@@ -413,8 +409,8 @@ queue, so parallel tests would pair with each other's players.
 
 - **One process only.** The queue and live matches are in memory. A second
   instance means two players never meet.
-- **Some code is dead and some of it holds mock data.** Do not copy from
-  `components/home/` or `apps/api/src/infra/`. The current list is
+- **Some code is dead.** Do not take `apps/api/src/infra/` as a sign that this
+  uses Redis or Supabase. The current list is
   [Known rough edges](Development_Steps.md#known-rough-edges) in the build log.
 - **`pnpm dev` and the tests use different databases.** Accounts you create by
   hand will not appear in test runs. That is intentional.

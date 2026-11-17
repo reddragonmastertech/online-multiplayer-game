@@ -103,14 +103,13 @@ Safe deletions, now that the shape is proven.
 
 The three files still in use move first; then the folder goes.
 
-- [ ] `portrait.tsx` → `components/match/portrait.tsx` (used by
+- [x] `portrait.tsx` → `components/match/portrait.tsx` (used by
       `player-seat.tsx`). Drop the parts only the legacy lobby used.
-- [ ] `findStake` / `Stake` from `lobby-data.ts` → a small
-      `lib/cpu-stakes.ts` (used by `cpu-match-page.tsx`). Check whether the
-      stakes there should come from `MATCH_RULES.racStakes` instead of their
-      own list.
-- [ ] `intro-preview.tsx` → `components/intro/`.
-- [ ] Delete the rest of `components/home/` and `pages/home-page.tsx`. Their
+- [x] `findStake` / `Stake` from `lobby-data.ts` → a small
+      `lib/cpu-stakes.ts` (used by `cpu-match-page.tsx`). They now come from
+      `MATCH_RULES.racStakes`; the old list also offered USDT tables.
+- [x] `intro-preview.tsx` → `components/intro/`.
+- [x] Delete the rest of `components/home/` and `pages/home-page.tsx`. Their
       fake live matches, fake winners and chat messages go with them.
 
 **Done when** `components/home/` is gone and the typecheck and the e2e suite

@@ -1,4 +1,4 @@
-import { Portrait } from "@/components/home/portrait";
+import { Portrait } from "./portrait";
 import { cn } from "@/lib/utils";
 import type { MatchSeatView } from "./match-types";
 

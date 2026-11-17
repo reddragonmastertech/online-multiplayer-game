@@ -1,16 +1,15 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-export function portraitUrl(id: number) {
+/**
+ * Stock art for the CPU opponent in practice matches only. Real players get
+ * `InitialsAvatar` instead: these are photographs of real people, and putting
+ * one next to a real player's name would misrepresent them.
+ */
+function portraitUrl(id: number) {
   const img = (Math.abs(id) % 70) + 1;
   return `https://i.pravatar.cc/160?img=${img}`;
 }
-
-export function photoUrl(seed: string, width: number, height = width) {
-  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/${width}/${height}`;
-}
-
-export const logoUrl = photoUrl("rps-arena-mark", 128, 128);
 
 function fallbackSrc(label: string) {
   const hue = [...label].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360;
@@ -34,27 +33,6 @@ export function Portrait({
     <img
       src={src}
       alt=""
-      className={cn("bg-[#1a2740] object-cover", className)}
-      onError={() => setSrc(fallbackSrc(name))}
-    />
-  );
-}
-
-export function Photo({
-  seed,
-  name,
-  className,
-}: {
-  seed: string;
-  name: string;
-  className?: string;
-}) {
-  const [src, setSrc] = useState(() => photoUrl(seed, 240, 160));
-
-  return (
-    <img
-      src={src}
-      alt={name}
       className={cn("bg-[#1a2740] object-cover", className)}
       onError={() => setSrc(fallbackSrc(name))}
     />

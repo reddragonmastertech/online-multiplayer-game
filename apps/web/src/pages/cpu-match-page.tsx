@@ -8,7 +8,7 @@ import {
 import { MATCH_RULES, type RpsHand } from "@game-platform/shared";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { findStake, type Stake } from "@/components/home/lobby-data";
+import { findCpuStake, type CpuStake } from "@/lib/cpu-stakes";
 import { GameSurface } from "@/components/match/game-surface";
 import { MatchClosed } from "@/components/match/match-closed";
 import { MatchShell } from "@/components/match/match-shell";
@@ -28,7 +28,7 @@ function moveView(hand: RpsHand | null, hide: boolean): MatchMoveView {
   return hand;
 }
 
-function CpuTable({ stake }: { stake: Stake }) {
+function CpuTable({ stake }: { stake: CpuStake }) {
   const [match, setMatch] = useState<RpsState>(createMatch);
   const [uiPhase, setUiPhase] = useState<"choose" | "thinking">("choose");
   const [seconds, setSeconds] = useState<number>(MATCH_RULES.roundSeconds);
@@ -184,7 +184,7 @@ function CpuTable({ stake }: { stake: Stake }) {
 
 export function CpuMatchPage() {
   const { stakeId = "" } = useParams();
-  const stake = findStake(stakeId);
+  const stake = findCpuStake(stakeId);
 
   if (!stake) {
     return (
